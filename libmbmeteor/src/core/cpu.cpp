@@ -20,7 +20,7 @@ using namespace std;
 
 namespace gba
 {
-    CPUInterface::CPUInterface(MMU& memory) : mem(memory)
+    CPUInterface::CPUInterface(MMU& memory, GPU& graphics) : mem(memory), gpu(graphics)
     {
 
     }
@@ -30,10 +30,11 @@ namespace gba
 	
     }
 
-    CPU::CPU(MMU& memory) : mem(memory)
+    CPU::CPU(MMU& memory, GPU& graphics) : mem(memory), gpu(graphics)
     {
-	inter = new CPUInterface(mem);
-	arm.setinterface(inter);
+	arm = &mem.memarm;
+	inter = new CPUInterface(mem, gpu);
+	arm->setinterface(inter);
     }
 
     CPU::~CPU()
@@ -43,9 +44,9 @@ namespace gba
 
     void CPU::init()
     {
-	arm.init(0x8000000, 0x5F);
-	arm.armreg.r13 = 0x3007F00;
-	arm.armreg.r13irq = 0x3007FA0;
+	arm->init(0x8000000, 0x5F);
+	arm->armreg.r13 = 0x3007F00;
+	arm->armreg.r13irq = 0x3007FA0;
 	cout << "CPU::Initialized" << endl;
     }
 

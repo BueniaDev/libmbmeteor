@@ -17,18 +17,37 @@
 #include "../../include/libmbmeteor/mmu.h"
 using namespace gba;
 using namespace std;
+using namespace std::placeholders;
 
 namespace gba
 {
     MMU::MMU()
     {
-
+		for (int i = 0x60; i < 0x3FF; i++)
+		{
+			addmemoryreadhandler((0x4000000 + i), bind(&MMU::readtemp, this, _1));
+			addmemorywritehandler((0x4000000 + i), bind(&MMU::writetemp, this, _1, _2));
+		}
     }
 
     MMU::~MMU()
     {
 
     }
+	
+	void MMU::init()
+	{
+		wram256.resize(0x40000, 0);
+		vram.resize(0x18000, 0);
+		cout << "MMU::Initialized" << endl;
+	}
+	
+	void MMU::shutdown()
+	{
+		wram256.clear();
+		vram.clear();
+		cout << "MMU::Shutting down..." << endl;
+	}
 
     uint8_t MMU::readByte(uint32_t addr)
     {
@@ -39,6 +58,38 @@ namespace gba
 
 	switch (addrtemp)
 	{
+		case 0x0:
+		{
+			if (addr < 0x4000)
+			{
+				temp = 0xFF;
+			}
+			else
+			{
+				temp = readopenbus(addr);
+			}
+		}
+		break;
+		case 0x1:
+		{
+			temp = readopenbus(addr);
+		}
+		break;
+		case 0x2:
+		{
+			temp = wram256[(addr & 0x3FFFF)];
+		}
+		break;
+		case 0x4:
+		{
+			temp = memoryreadhandlers[(addr & 0x3FE)](addr);
+		}
+		break;
+		case 0x6:
+		{
+			temp = vram[(addr & 0x17FFF)];
+		}
+		break;
 	    case 0x8:
 	    {
 		temp = gamerom[(addr & 0xFFFFFF)];
@@ -58,6 +109,21 @@ namespace gba
 
 	switch (addrtemp)
 	{
+		case 0x2:
+		{
+			wram256[(addr & 0x3FFFF)] = val;
+		}
+		break;
+		case 0x4:
+		{
+			memorywritehandlers[(addr & 0x3FE)](addr, val);
+		}
+		break;
+		case 0x6:
+		{
+			vram[(addr & 0x17FFF)] = val;
+		}
+		break;
 	    case 0x8:
 	    {
 		return;

@@ -24,6 +24,7 @@
 #include <memory>
 #include <utility>
 #include "mmu.h"
+#include "gpu.h"
 #include <BeeARM/beearm.h>
 #include <BeeARM/beearm_tables.h>
 using namespace std;
@@ -35,10 +36,11 @@ namespace gba
     class LIBMBMETEOR_API CPUInterface : public BeeARMInterface
     {
 	public:
-	    CPUInterface(MMU& memory);
+	    CPUInterface(MMU& memory, GPU& graphics);
 	    ~CPUInterface();
 
-	    MMU &mem;
+	    MMU& mem;
+		GPU& gpu;
 
 	    uint8_t readByte(uint32_t addr)
 	    {
@@ -77,26 +79,27 @@ namespace gba
 
 	    void update()
 	    {
-		return;
+			gpu.updatelcd();
 	    }
     };
 
     class LIBMBMETEOR_API CPU
     {
 	public:
-	    CPU(MMU& memory);
+	    CPU(MMU& memory, GPU& graphics);
 	    ~CPU();
 
 	    void init();
 	    void shutdown();
 
 	    MMU& mem;
+		GPU& gpu;
 
 	    CPUInterface *inter;
 
 	    inline void executenextinstr()
 	    {
-		arm.executenextinstr();
+		arm->executenextinstr();
 	    }
 
 	    inline int runfor(int cycles)
@@ -104,13 +107,13 @@ namespace gba
 		while (cycles > 0)
 		{
 		    executenextinstr();
-		    cycles -= arm.clockcycles;
+		    cycles -= arm->clockcycles;
 		}
 
 		return cycles;
 	    }
 
-	    BeeARM arm;
+	    BeeARM *arm;
     };
 };
 

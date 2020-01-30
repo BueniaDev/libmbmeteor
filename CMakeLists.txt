@@ -19,11 +19,13 @@ set(LIBMBMETEOR_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/libmbmeteor/include")
 set(LIBMBMETEOR_API_HEADERS
 	libmbmeteor/include/libmbmeteor/libmbmeteor_api.h
 	libmbmeteor/include/libmbmeteor/mmu.h
-	libmbmeteor/include/libmbmeteor/cpu.h)
+	libmbmeteor/include/libmbmeteor/cpu.h
+	libmbmeteor/include/libmbmeteor/gpu.h)
 
 set(LIBMBMETEOR
 	libmbmeteor/src/core/mmu.cpp
-	libmbmeteor/src/core/cpu.cpp)
+	libmbmeteor/src/core/cpu.cpp
+	libmbmeteor/src/core/gpu.cpp)
 
 add_subdirectory(external)
 add_definitions(-DBEEARM_ENABLE_THUMB)

@@ -22,17 +22,54 @@
 #include <vector>
 #include <iostream>
 #include <fstream>
+#include <functional>
+#include <BeeARM/beearm.h>
+#include <BeeARM/beearm_tables.h>
 using namespace std;
+using namespace beearm;
 
 namespace gba
 {
+	using memoryreadfunc = function<uint8_t(uint32_t)>;
+	using memorywritefunc = function<void(uint32_t, uint8_t)>;
+	
     class LIBMBMETEOR_API MMU
     {
 	public:
 	    MMU();
 	    ~MMU();
 
+		void init();
+		void shutdown();
+
+		vector<uint8_t> wram256;
+		vector<uint8_t> vram;
 	    vector<uint8_t> gamerom;
+		
+		BeeARM memarm; // For "open-bus" behavior
+		
+		array<memoryreadfunc, 0x3FF> memoryreadhandlers;
+		array<memorywritefunc, 0x3FF> memorywritehandlers;
+		
+		void addmemoryreadhandler(uint32_t addr, memoryreadfunc cb)
+		{
+			memoryreadhandlers.at((addr - 0x4000000)) = cb;
+		}
+		
+		void addmemorywritehandler(uint32_t addr, memorywritefunc cb)
+		{
+			memorywritehandlers.at((addr - 0x4000000)) = cb;
+		}
+		
+		uint8_t readtemp(uint32_t addr)
+		{
+			return 0xFF;
+		}
+		
+		void writetemp(uint32_t addr, uint8_t val)
+		{
+			return;
+		}
 
 	    uint8_t readByte(uint32_t addr);
 	    void writeByte(uint32_t addr, uint8_t val);
@@ -42,6 +79,27 @@ namespace gba
 	    void writeLong(uint32_t addr, uint32_t val);
 
 	    bool loadROM(string filename);
+		
+		uint8_t readopenbus(uint32_t addr)
+		{
+			uint8_t temp = 0;
+			
+			uint32_t armtemp = 0;
+			
+			if (memarm.instmode == memarm.armmode)
+			{
+				armtemp = readLong((memarm.getreg(15) + 8));
+			}
+			else
+			{
+				uint16_t thumbtemp = readWord((memarm.getreg(15) + 4));
+				armtemp = ((thumbtemp << 16) | thumbtemp);
+			}
+			
+			int addrtemp = (addr & 0x3);
+			temp = ((armtemp >> (addrtemp << 3)) & 0xFF);
+			return temp;
+		}
     };
 };
 

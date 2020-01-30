@@ -1,12 +1,16 @@
 #include <libmbmeteor/mmu.h>
 #include <libmbmeteor/cpu.h>
+#include <libmbmeteor/gpu.h>
 using namespace gba;
 
 MMU mmu;
-CPU cpu(mmu);
+GPU gpu(mmu);
+CPU cpu(mmu, gpu);
 
 int main(int argc, char* argv[])
 {
+	mmu.init();
+	
     if (!mmu.loadROM(argv[1]))
     {
 	return 1;
@@ -18,5 +22,6 @@ int main(int argc, char* argv[])
 
 
     cpu.shutdown();
+	mmu.shutdown();
     return 0;
 }
