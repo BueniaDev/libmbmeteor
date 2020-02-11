@@ -74,12 +74,32 @@ namespace gba
 
 	    int clockcycle(uint32_t val, int flags)
 	    {
-		return 1;
+		val = (val % 0x1000000);
+
+		if (val < 0x8000000)
+		{
+		    return 1;
+		}
+		else if (val < 0xA000000)
+		{
+		    if (TestBit(flags, 1))
+		    {
+			return 5;
+		    }
+		    else
+		    {
+			return 3;
+		    }
+		}
+		else
+		{
+		    return 1;
+		}
 	    }
 
 	    void update()
 	    {
-			gpu.updatelcd();
+		gpu.updatelcd();
 	    }
     };
 
@@ -106,8 +126,9 @@ namespace gba
 	    {
 		while (cycles > 0)
 		{
+		    int clockcycles = arm->clockcycles;
 		    executenextinstr();
-		    cycles -= arm->clockcycles;
+		    cycles -= (arm->clockcycles - clockcycles);
 		}
 
 		return cycles;

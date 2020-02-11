@@ -38,14 +38,20 @@ namespace gba
 	void MMU::init()
 	{
 		wram256.resize(0x40000, 0);
+		wram32.resize(0x8000, 0);
+		pram.resize(0x400, 0);
 		vram.resize(0x18000, 0);
+		oam.resize(0x400, 0);
 		cout << "MMU::Initialized" << endl;
 	}
 	
 	void MMU::shutdown()
 	{
 		wram256.clear();
+		wram32.clear();
+		pram.clear();
 		vram.clear();
+		oam.clear();
 		cout << "MMU::Shutting down..." << endl;
 	}
 
@@ -80,14 +86,29 @@ namespace gba
 			temp = wram256[(addr & 0x3FFFF)];
 		}
 		break;
+		case 0x3:
+		{
+			temp = wram32[(addr & 0x7FFF)];
+		}
+		break;
 		case 0x4:
 		{
-			temp = memoryreadhandlers[(addr & 0x3FE)](addr);
+			temp = memoryreadhandlers[(addr & 0xFFF)](addr);
+		}
+		break;
+		case 0x5:
+		{
+			temp = pram[(addr & 0xFFF)];
 		}
 		break;
 		case 0x6:
 		{
-			temp = vram[(addr & 0x17FFF)];
+			temp = vram[(addr & 0xFFFFFF)];
+		}
+		break;
+		case 0x7:
+		{
+			temp = oam[(addr & 0xFFF)];
 		}
 		break;
 	    case 0x8:
@@ -111,17 +132,32 @@ namespace gba
 	{
 		case 0x2:
 		{
-			wram256[(addr & 0x3FFFF)] = val;
+			wram256[(addr & 0xFFFFF)] = val;
+		}
+		break;
+		case 0x3:
+		{
+			wram32[(addr & 0x7FFF)] = val;
 		}
 		break;
 		case 0x4:
 		{
-			memorywritehandlers[(addr & 0x3FE)](addr, val);
+			memorywritehandlers[(addr & 0xFFF)](addr, val);
+		}
+		break;
+		case 0x5:
+		{
+			pram[(addr & 0xFFF)] = val;
 		}
 		break;
 		case 0x6:
 		{
-			vram[(addr & 0x17FFF)] = val;
+			vram[(addr & 0xFFFFFF)] = val;
+		}
+		break;
+		case 0x7:
+		{
+			oam[(addr & 0xFFF)] = val;
 		}
 		break;
 	    case 0x8:

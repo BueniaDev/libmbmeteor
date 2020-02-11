@@ -7,7 +7,7 @@ set(EXAMPLE_SOURCES
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17")
 
-include_directories(${LIBMBGB_INCLUDE_DIR} ${SDL2_INCLUDE_DIRS})
+include_directories(${LIBMBMETEOR_INCLUDE_DIR} ${SDL2_INCLUDE_DIRS})
 
 add_executable(example ${EXAMPLE_SOURCES})
-target_link_libraries(example libmbmeteor BeeARM ${SDL_LIBRARIES})
+target_link_libraries(example libmbmeteor BeeARM ${SDL2_LIBRARIES})

@@ -43,7 +43,10 @@ namespace gba
 		void shutdown();
 
 		vector<uint8_t> wram256;
+		vector<uint8_t> wram32;
+		vector<uint8_t> pram;
 		vector<uint8_t> vram;
+		vector<uint8_t> oam;
 	    vector<uint8_t> gamerom;
 		
 		BeeARM memarm; // For "open-bus" behavior
@@ -63,12 +66,14 @@ namespace gba
 		
 		uint8_t readtemp(uint32_t addr)
 		{
-			return 0xFF;
+		    cout << "Unrecognized read from " << hex << (int)(addr) << endl;
+		    return 0xFF;
 		}
 		
 		void writetemp(uint32_t addr, uint8_t val)
 		{
-			return;
+		    cout << "Unrecognized write to " << hex << (int)(addr) << endl;
+		    return;
 		}
 
 	    uint8_t readByte(uint32_t addr);
