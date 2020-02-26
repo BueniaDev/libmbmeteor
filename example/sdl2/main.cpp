@@ -1,6 +1,8 @@
 #include <libmbmeteor/libmbmeteor.h>
 #include <SDL2/SDL.h>
+#include <iostream>
 #include <sstream>
+#include <ctime>
 using namespace gba;
 using namespace std;
 
@@ -15,6 +17,18 @@ int scale = 2;
 
 int fpscount = 0;
 Uint32 fpstime = 0;
+
+void screenshot()
+{
+    time_t currenttime = time(nullptr);
+    string screenstring = "mbmeteor_";
+    screenstring.append(std::to_string(currenttime));
+    screenstring.append(".bmp");
+
+    SDL_SaveBMP(surface, screenstring.c_str());
+
+    cout << "Screenshot saved." << endl;
+}
 
 bool initsdl()
 {
@@ -52,6 +66,7 @@ void processinput(SDL_Event event)
 	    case SDLK_RIGHT: core.keypressed(Button::Right); break;
 	    case SDLK_UP: core.keypressed(Button::Up); break;
 	    case SDLK_DOWN: core.keypressed(Button::Down); break;
+	    case SDLK_q: screenshot(); break;
 	}
     }
     else if (event.type == SDL_KEYUP)

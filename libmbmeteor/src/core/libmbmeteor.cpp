@@ -37,6 +37,11 @@ namespace gba
     {
 	coremmu->init();
 
+	if (!loadBIOS(biosname))
+	{
+	    return false;
+	}
+
 	if (!loadROM(romname))
 	{
 	    return false;
@@ -63,7 +68,7 @@ namespace gba
 
     bool GBACore::getoptions(int argc, char* argv[])
     {
-	if (argc < 2)
+	if (argc < 3)
 	{
 	    printusage(argv[0]);
 	    return false;
@@ -79,6 +84,7 @@ namespace gba
 	}
 
 	romname = argv[1];
+	biosname = argv[2];
 
 	return true;
     }
@@ -86,6 +92,11 @@ namespace gba
     bool GBACore::loadROM(string filename)
     {
 	return coremmu->loadROM(filename);
+    }
+
+    bool GBACore::loadBIOS(string filename)
+    {
+	return coremmu->loadBIOS(filename);
     }
 
     RGB GBACore::getpixel(int x, int y)

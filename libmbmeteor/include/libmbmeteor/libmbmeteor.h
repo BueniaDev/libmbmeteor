@@ -49,6 +49,7 @@ namespace gba
 	    bool getoptions(int argc, char* argv[]);
 	    void printusage(char* argv);
 	    bool loadROM(string filename);
+	    bool loadBIOS(string filename);
 	    RGB getpixel(int x, int y);
 	    void keypressed(Button button);
 	    void keyreleased(Button button);
@@ -57,6 +58,7 @@ namespace gba
 	    int overspentcycles = 0;
 
 	    string romname;
+	    string biosname;
     };
 };
 

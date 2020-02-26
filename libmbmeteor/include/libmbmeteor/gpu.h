@@ -51,19 +51,26 @@ namespace gba
 			
 			int scanlinecounter = 0;
 			int pixelx = 0;
+			int lcdmode;
 			
 			void updatevcount();
 
 			void renderpixel();
 			void renderscanline();
 			void renderbgmode0();
+			void renderbgmode1();
+			void renderbgmode2();
 			void renderbgmode3();
 			void renderbgmode4();
 			void renderbgmode5();
 
 			void rendercomposite();
+			void renderbitmap(int layernum, int mode);
 
-			void renderbg(int layernum);
+			void renderbgreg(int layernum);
+			void renderbgtrans(int layernum);
+
+			int bglayers[4] = {3, 2, 1, 0};
 
 			uint16_t getbgcontrol(int layernum)
 			{
@@ -72,6 +79,9 @@ namespace gba
 			    switch ((layernum & 0x3))
 			    {
 				case 0: temp = bg0cnt; break;
+				case 1: temp = bg1cnt; break;
+				case 2: temp = bg2cnt; break;
+				case 3: temp = bg3cnt; break;
 				default: cout << "Unrecognized layer number of " << dec << (int)((layernum & 0x3)) << endl; exit(1); break;
 			    }
 
@@ -85,6 +95,9 @@ namespace gba
 			    switch ((layernum & 0x3))
 			    {
 				case 0: temp = bg0hoffs; break;
+				case 1: temp = bg1hoffs; break;
+				case 2: temp = bg2hoffs; break;
+				case 3: temp = bg3hoffs; break;
 				default: cout << "Unrecognized layer number of " << dec << (int)((layernum & 0x3)) << endl; exit(1); break;
 			    }
 
@@ -98,6 +111,9 @@ namespace gba
 			    switch ((layernum & 0x3))
 			    {
 				case 0: temp = bg0voffs; break;
+				case 1: temp = bg1voffs; break;
+				case 2: temp = bg2voffs; break;
+				case 3: temp = bg3voffs; break;
 				default: cout << "Unrecognized layer number of " << dec << (int)((layernum & 0x3)) << endl; exit(1); break;
 			    }
 
@@ -110,6 +126,9 @@ namespace gba
 			    switch ((layernum & 0x3))
 			    {
 				case 0: temp = bg0buffer[x]; break;
+				case 1: temp = bg1buffer[x]; break;
+				case 2: temp = bg2buffer[x]; break;
+				case 3: temp = bg3buffer[x]; break;
 				default: cout << "Unrecognized layer number of " << dec << (int)((layernum & 0x3)) << endl; exit(1); break;
 			    }
 
@@ -121,76 +140,23 @@ namespace gba
 			    switch ((layernum & 0x3))
 			    {
 				case 0: bg0buffer[x] = pixel; break;
+				case 1: bg1buffer[x] = pixel; break;
+				case 2: bg2buffer[x] = pixel; break;
+				case 3: bg3buffer[x] = pixel; break;
 				default: cout << "Unrecognized layer number of " << dec << (int)((layernum & 0x3)) << endl; exit(1); break;
 			    }
-			}
-
-			uint16_t getbgdata(int layernum)
-			{
-			    uint16_t temp = 0;
-
-			    switch ((layernum & 0x3))
-			    {
-				case 0: temp = bg0data; break;
-				default: cout << "Unrecognized layer number of " << dec << (int)((layernum & 0x3)) << endl; exit(1); break;
-			    }
-
-			    return temp;
-			}
-
-			void setbgdata(int layernum, uint16_t data)
-			{
-			    switch ((layernum & 0x3))
-			    {
-				case 0: bg0data = data; break;
-				default: cout << "Unrecognized layer number of " << dec << (int)((layernum & 0x3)) << endl; exit(1); break;
-			    }
-			}
-
-			uint16_t readtilegba(int mapbase, int x, int y)
-			{
-			    uint16_t tmaddr = mapbase;
-			    tmaddr += ((((y >> 3) << 5) + (x >> 3)) << 1);
-			    return readvram16(tmaddr);
-			}
-
-			uint16_t getgbacolor(int layernum, uint16_t tile, int cbb, int x, int y)
-			{
-			    uint16_t bgcnt = getbgcontrol(layernum);
-			    int tilenumber = (tile & 0x3FF);
-
-	   		    int tile4bit = TestBit(bgcnt, 7) ? 0 : 1;
-	    		    int tilesizeshift = (6 - tile4bit);
-
-			    int tileaddr = (cbb + (tilenumber << tilesizeshift) + (((y << 3) + x) >> tile4bit));
-
-			    int paletteaddr = 0;
-
-			    if (TestBit(bgcnt, 7))
-			    {
-				uint8_t paletteindex = gpumem.vram[tileaddr];
-
-				paletteaddr = paletteindex;
-			    }
-			    else
-			    {
-				int paletteindex = (gpumem.vram[tileaddr] >> (TestBit(x, 0) << 2) & 0xF);
-
-				paletteaddr = (((tile >> 8) & 0xF0) + paletteindex);
-			    }
-
-			    uint16_t color = readpram16(paletteaddr);
-
-			    return (color == 0) ? 0x8000 : color;
 			}
 
 			RGB framebuffer[(240 * 160)];
-			RGB scanlinebuffer[240];
 			uint16_t bg0buffer[240];
+			uint16_t bg1buffer[240];
+			uint16_t bg2buffer[240];
+			uint16_t bg3buffer[240];
 
 			RGB black = {0, 0, 0};
 
 			uint16_t dispcnt = 0;
+			uint16_t dispstat = 0;
 			uint16_t vcount = 0;
 			uint16_t bg0cnt = 0;
 
@@ -198,6 +164,116 @@ namespace gba
 			int bg0voffs = 0;
 
 			uint16_t bg0data = 0;
+
+			uint16_t bg1cnt = 0;
+
+			int bg1hoffs = 0;
+			int bg1voffs = 0;
+
+			uint16_t bg1data = 0;
+
+			uint16_t bg2cnt = 0;
+
+			int bg2hoffs = 0;
+			int bg2voffs = 0;
+
+			uint16_t bg2data = 0;
+
+			uint16_t bg3cnt = 0;
+
+			int bg3hoffs = 0;
+			int bg3voffs = 0;
+
+			uint16_t bg3data = 0;
+
+			uint16_t blendcnt = 0;
+			int blendeva = 0;
+			int blendevb = 0;
+			int blendevy = 0;
+
+			uint16_t alphablendeffect(uint16_t first, uint16_t second)
+			{
+			    int red1 = (first & 0x1F);
+			    int green1 = ((first >> 5) & 0x1F);
+			    int blue1 = ((first >> 10) & 0x1F);
+
+			    int red2 = (second & 0x1F);
+			    int green2 = ((second >> 5) & 0x1F);
+			    int blue2 = ((second >> 10) & 0x1F);
+
+			    int eva = min(blendeva, 16);
+			    int evb = min(blendevb, 16);
+
+			    red1 = (red1 * eva + 8) >> 4;
+			    green1 = (green1 * eva + 8) >> 4;
+			    blue1 = (blue1 * eva + 8) >> 4;
+
+			    red2 = (red2 * evb + 8) >> 4;
+			    green2 = (green2 * evb + 8) >> 4;
+			    blue2 = (blue2 * evb + 8) >> 4;
+
+			    int red = min(31, (red1 + red2));
+			    int green = min(31, (green1 + green2));
+			    int blue = min(31, (blue1 + blue2));
+
+			    uint16_t tempcolor = (((blue & 0x1F) << 10) | ((green & 0x1F) << 5) | (red & 0x1F));
+			    return (tempcolor & 0x7FFF);
+			}		
+
+			uint16_t brightnesseffect(bool decrease, uint16_t color)
+			{
+			    int red = (color & 0x1F);
+			    int green = ((color >> 5) & 0x1F);
+			    int blue = ((color >> 10) & 0x1F);
+
+			    int evy = min(blendevy, 16);
+
+			    if (decrease)
+			    {
+				red -= (red * evy + 8) >> 4;
+				green -= (green * evy + 8) >> 4;
+				blue -= (blue * evy + 8) >> 4;
+			    }
+			    else
+			    {
+				red += ((31 - red) * evy + 8) >> 4;
+				green += ((31 - green) * evy + 8) >> 4;
+				blue += ((31 - blue) * evy + 8) >> 4;
+			    }
+
+			    uint16_t tempcolor = (((blue & 0x1F) << 10) | ((green & 0x1F) << 5) | (red & 0x1F));
+			    return (tempcolor & 0x7FFF);
+			}
+
+			void vblank(bool val)
+			{
+			    dispstat = BitChange(dispstat, 0, val);
+
+			    if (TestBit(dispstat, 3))
+			    {
+			        gpumem.writeLong(0x3007FF8, BitChange(gpumem.readLong(0x3007FF8), 0, val));
+
+				if (val)
+				{
+				    gpumem.setinterrupt(0);
+				}
+			    }
+			}
+
+			void hblank(bool val)
+			{
+			    dispstat = BitChange(dispstat, 1, val);
+
+			    if (TestBit(dispstat, 4))
+			    {
+			        gpumem.writeLong(0x3007FF8, BitChange(gpumem.readLong(0x3007FF8), 1, val));
+				
+				if (val)
+				{
+				    gpumem.setinterrupt(1);
+				}
+			    }
+			}
 
 			uint16_t readvram16(uint32_t addr)
 			{

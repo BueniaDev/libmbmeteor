@@ -42,6 +42,8 @@ namespace gba
 	    MMU& mem;
 		GPU& gpu;
 
+	    bool isswi = false;
+
 	    uint8_t readByte(uint32_t addr)
 	    {
 		return mem.readByte(addr);
@@ -74,9 +76,17 @@ namespace gba
 
 	    int clockcycle(uint32_t val, int flags)
 	    {
-		val = (val % 0x1000000);
+		val = (val % 0x10000000);
 
-		if (val < 0x8000000)
+		if (val < 0x2000000)
+		{
+		    return 1;
+		}
+		else if (val < 0x2040000)
+		{
+		    return 3;
+		}
+		else if (val < 0x8000000)
 		{
 		    return 1;
 		}
@@ -84,11 +94,72 @@ namespace gba
 		{
 		    if (TestBit(flags, 1))
 		    {
-			return 5;
+			int temp = 0;
+
+			int nonseq = ((mem.waitcnt >> 2) & 0x3);
+
+			switch (nonseq)
+			{
+			    case 0: temp = 5; break;
+			    case 1: temp = 4; break;
+			    case 2: temp = 3; break;
+			    case 3: temp = 9; break;
+			}
+
+			return temp;
 		    }
 		    else
 		    {
-			return 3;
+			return TestBit(mem.waitcnt, 4) ? 3 : 2;
+		    }
+		}
+		else if (val < 0xC000000)
+		{
+		    if (TestBit(flags, 1))
+		    {
+			int temp = 0;
+
+			int nonseq = ((mem.waitcnt >> 2) & 0x3);
+
+			switch (nonseq)
+			{
+			    case 0: temp = 5; break;
+			    case 1: temp = 4; break;
+			    case 2: temp = 3; break;
+			    case 3: temp = 9; break;
+			}
+
+			return temp;
+		    }
+		    else
+		    {
+			return TestBit(mem.waitcnt, 4) ? 5 : 2;
+		    }
+		}
+		else if (val < 0xD000000)
+		{
+		    return 1;
+		}
+		else if (val < 0xE000000)
+		{
+		    if (mem.iseeprom())
+		    {
+			return 9;
+		    }
+		    else
+		    {
+			return 1;
+		    }
+		}
+		else if (val < 0xF000000)
+		{
+		    if (mem.issram())
+		    {
+			return 9;
+		    }
+		    else
+		    {
+			return 1;
 		    }
 		}
 		else
@@ -100,6 +171,17 @@ namespace gba
 	    void update()
 	    {
 		gpu.updatelcd();
+		mem.updatedma();
+	    }
+
+	    void softwareinterrupt(uint8_t val)
+	    {
+		if (val == 0x12)
+		{
+		    isswi = true;
+		}
+
+		mem.softwareinterrupt();
 	    }
     };
 
@@ -115,6 +197,13 @@ namespace gba
 	    MMU& mem;
 		GPU& gpu;
 
+	    int tempcycles = 0;
+
+	    bool dump = false;
+	    bool isinterrupt = false;
+
+	    int temp = 0;
+
 	    CPUInterface *inter;
 
 	    inline void executenextinstr()
@@ -126,9 +215,25 @@ namespace gba
 	    {
 		while (cycles > 0)
 		{
+
+		    if (mem.dmainprogress())
+		    {
+			mem.updatedma();
+			continue;
+		    }
+
+		    if ((mem.interruptmasterenable && !TestBit(arm->getcpsr(), 7)))
+		    {
+			if (mem.isinterruptsenabled())
+			{
+			    arm->irqexception();
+			}
+		    }
+
 		    int clockcycles = arm->clockcycles;
 		    executenextinstr();
-		    cycles -= (arm->clockcycles - clockcycles);
+		    tempcycles = (arm->clockcycles - clockcycles);
+		    cycles -= tempcycles;
 		}
 
 		return cycles;
