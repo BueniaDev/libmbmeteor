@@ -21,6 +21,7 @@ set(LIBMBMETEOR_API_HEADERS
 	libmbmeteor/include/libmbmeteor/mmu.h
 	libmbmeteor/include/libmbmeteor/cpu.h
 	libmbmeteor/include/libmbmeteor/gpu.h
+	libmbmeteor/include/libmbmeteor/timers.h
 	libmbmeteor/include/libmbmeteor/input.h
 	libmbmeteor/include/libmbmeteor/libmbmeteor.h)
 
@@ -28,6 +29,7 @@ set(LIBMBMETEOR
 	libmbmeteor/src/core/mmu.cpp
 	libmbmeteor/src/core/cpu.cpp
 	libmbmeteor/src/core/gpu.cpp
+	libmbmeteor/src/core/timers.cpp
 	libmbmeteor/src/core/input.cpp
 	libmbmeteor/src/core/libmbmeteor.cpp)
 

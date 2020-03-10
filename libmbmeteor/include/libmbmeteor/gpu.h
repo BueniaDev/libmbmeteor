@@ -64,13 +64,15 @@ namespace gba
 			void renderbgmode4();
 			void renderbgmode5();
 
+			void renderobjects();
 			void rendercomposite();
 			void renderbitmap(int layernum, int mode);
 
 			void renderbgreg(int layernum);
+			void renderbgaff(int layernum);
 			void renderbgtrans(int layernum);
 
-			int bglayers[4] = {3, 2, 1, 0};
+			int bglayers[5] = {3, 2, 1, 0, 4};
 
 			uint16_t getbgcontrol(int layernum)
 			{
@@ -152,6 +154,8 @@ namespace gba
 			uint16_t bg1buffer[240];
 			uint16_t bg2buffer[240];
 			uint16_t bg3buffer[240];
+			uint16_t objbuffer[240];
+			int objinfobuffer[240];
 
 			RGB black = {0, 0, 0};
 
@@ -185,6 +189,32 @@ namespace gba
 			int bg3voffs = 0;
 
 			uint16_t bg3data = 0;
+
+			struct BGAffine
+			{
+			    int pa = 1;
+			    int pb = 0;
+			    int pc = 0;
+			    int pd = 1;
+			    int x = 0;
+			    int y = 0;
+			    int cx = 0;
+			    int cy = 0;
+			};
+
+			void setcx(int layernum)
+			{
+			    bgaff[layernum].cx = (bgaff[layernum].x & 0x7FFFF00);
+
+			    if (TestBit(bgaff[layernum].x, 27))
+			    {
+				bgaff[layernum].cx *= -1;
+			    }
+			}
+
+			BGAffine bgaff[2];
+
+			uint8_t objmosaic = 0;
 
 			uint16_t blendcnt = 0;
 			int blendeva = 0;
@@ -278,6 +308,11 @@ namespace gba
 			uint16_t readvram16(uint32_t addr)
 			{
 			    return ((gpumem.vram[(addr + 1)] << 8) | (gpumem.vram[addr]));
+			}
+			
+			uint16_t readoam16(uint32_t addr)
+			{
+			    return ((gpumem.oam[(addr + 1)] << 8) | (gpumem.oam[addr]));
 			}
 
 			uint16_t readpram16(int index)

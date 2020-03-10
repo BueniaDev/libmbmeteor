@@ -23,7 +23,7 @@ namespace gba
 {
     Input::Input(MMU& memory) : inputmem(memory)
     {
-	for (int i = 0x130; i < 0x132; i++)
+	for (int i = 0x130; i < 0x134; i++)
 	{
 	    inputmem.addmemoryreadhandler((0x4000000 + i), bind(&Input::readinput, this, _1));
 	    inputmem.addmemorywritehandler((0x4000000 + i), bind(&Input::writeinput, this, _1, _2));
@@ -43,6 +43,8 @@ namespace gba
 	{
 	    case 0x130: temp = (keyinput & 0xFF); break;
 	    case 0x131: temp = (keyinput >> 8); break;
+	    case 0x132: temp = (keycontrol & 0xFF); break;
+	    case 0x133: temp = (keycontrol >> 8); break;
 	    default: cout << "Unrecognized read from " << hex << (int)(addr) << endl; temp = 0x00; break;
 	}
 
@@ -55,6 +57,8 @@ namespace gba
 	{
 	    case 0x130: return; break;
 	    case 0x131: return; break;
+	    case 0x132: keycontrol = ((keycontrol & 0xFF00) | val); break;
+	    case 0x133: keycontrol = (((val & 0xC3) << 8) | (keycontrol & 0xFF)); break;
 	    default: cout << "Unrecognized write to " << hex << (int)(addr) << endl; break;
 	}
     }
@@ -62,6 +66,24 @@ namespace gba
     void Input::keypressed(Button button)
     {
 	keyinput = BitReset(keyinput, button);
+
+	if ((lastinput != keyinput) && (keyinput != 0x3FF))
+	{
+	    int keymask = (keycontrol & 0x3FF);
+
+	    bool iskeypadirq = TestBit(keycontrol, 15) ? ((keyinput & keymask) == keymask) : (keyinput & keymask);
+
+	    if (iskeypadirq && TestBit(keycontrol, 14))
+	    {
+		keypadirq(true);
+	    }
+	    else
+	    {
+		keypadirq(false);
+	    }
+
+	    lastinput = keyinput;
+	}
     }
 
     void Input::keyreleased(Button button)

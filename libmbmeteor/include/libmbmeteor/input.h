@@ -48,12 +48,26 @@ namespace gba
 	    MMU& inputmem;
 
 	    uint16_t keyinput = 0x3FF;
+	    uint16_t keycontrol = 0;
+	    uint16_t lastinput = 0;
+
+	    bool dump = false;
 
 	    uint8_t readinput(uint32_t addr);
 	    void writeinput(uint32_t addr, uint8_t val);
 
 	    void keypressed(Button button);
 	    void keyreleased(Button button);
+
+	    void keypadirq(bool val)
+	    {
+		inputmem.writeLong(0x3007FF8, BitChange(inputmem.readLong(0x3007FF8), 12, val));
+		
+		if (val)
+		{
+		    inputmem.setinterrupt(12);
+		}
+	    }
     };
 };
 

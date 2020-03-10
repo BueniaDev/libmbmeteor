@@ -25,7 +25,8 @@ namespace gba
 	coremmu = make_unique<MMU>();
 	coregpu = make_unique<GPU>(*coremmu);
 	coreinput = make_unique<Input>(*coremmu);
-	corecpu = make_unique<CPU>(*coremmu, *coregpu);
+	coretimers = make_unique<Timers>(*coremmu);
+	corecpu = make_unique<CPU>(*coremmu, *coregpu, *coreinput, *coretimers);
     }
 
     GBACore::~GBACore()

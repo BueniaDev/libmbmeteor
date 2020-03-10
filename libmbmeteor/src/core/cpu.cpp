@@ -20,7 +20,7 @@ using namespace std;
 
 namespace gba
 {
-    CPUInterface::CPUInterface(MMU& memory, GPU& graphics) : mem(memory), gpu(graphics)
+    CPUInterface::CPUInterface(MMU& memory, GPU& graphics, Timers& timers) : mem(memory), gpu(graphics), timer(timers)
     {
 
     }
@@ -30,10 +30,10 @@ namespace gba
 	
     }
 
-    CPU::CPU(MMU& memory, GPU& graphics) : mem(memory), gpu(graphics)
+    CPU::CPU(MMU& memory, GPU& graphics, Input& input, Timers& timers) : mem(memory), gpu(graphics), joyp(input), timer(timers)
     {
 	arm = &mem.memarm;
-	inter = new CPUInterface(mem, gpu);
+	inter = new CPUInterface(mem, gpu, timer);
 	arm->setinterface(inter);
     }
 

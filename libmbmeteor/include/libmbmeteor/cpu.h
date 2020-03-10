@@ -25,6 +25,8 @@
 #include <utility>
 #include "mmu.h"
 #include "gpu.h"
+#include "input.h"
+#include "timers.h"
 #include <BeeARM/beearm.h>
 #include <BeeARM/beearm_tables.h>
 using namespace std;
@@ -36,13 +38,15 @@ namespace gba
     class LIBMBMETEOR_API CPUInterface : public BeeARMInterface
     {
 	public:
-	    CPUInterface(MMU& memory, GPU& graphics);
+	    CPUInterface(MMU& memory, GPU& graphics, Timers& timers);
 	    ~CPUInterface();
 
 	    MMU& mem;
-		GPU& gpu;
+	    GPU& gpu;
+	    Timers& timer;
 
 	    bool isswi = false;
+	    int clockcycles = 0;
 
 	    uint8_t readByte(uint32_t addr)
 	    {
@@ -170,13 +174,26 @@ namespace gba
 
 	    void update()
 	    {
+		clockcycles += 1;
 		gpu.updatelcd();
 		mem.updatedma();
+		timer.updatetimers();
 	    }
 
-	    void softwareinterrupt(uint8_t val)
+	    void softwareinterrupt(uint32_t val)
 	    {
-		if (val == 0x12)
+		uint8_t temp = 0;
+
+		if ((mem.memarm.instmode == mem.memarm.armmode))
+		{
+		    temp = (val >> 16); 
+		}
+		else
+		{
+		    temp = (val & 0xFF);
+		}
+
+		if (temp == 0xE)
 		{
 		    isswi = true;
 		}
@@ -188,14 +205,16 @@ namespace gba
     class LIBMBMETEOR_API CPU
     {
 	public:
-	    CPU(MMU& memory, GPU& graphics);
+	    CPU(MMU& memory, GPU& graphics, Input& input, Timers& timers);
 	    ~CPU();
 
 	    void init();
 	    void shutdown();
 
 	    MMU& mem;
-		GPU& gpu;
+	    GPU& gpu;
+	    Input& joyp;
+	    Timers& timer;
 
 	    int tempcycles = 0;
 
@@ -230,10 +249,9 @@ namespace gba
 			}
 		    }
 
-		    int clockcycles = arm->clockcycles;
 		    executenextinstr();
-		    tempcycles = (arm->clockcycles - clockcycles);
-		    cycles -= tempcycles;
+		    cycles -= inter->clockcycles;
+		    inter->clockcycles = 0;
 		}
 
 		return cycles;

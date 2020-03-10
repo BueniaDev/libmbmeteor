@@ -21,6 +21,7 @@
 #include "cpu.h"
 #include "gpu.h"
 #include "input.h"
+#include "timers.h"
 #include "libmbmeteor_api.h"
 #include <cstring>
 #include <memory>
@@ -41,6 +42,7 @@ namespace gba
 	    unique_ptr<MMU> coremmu;
 	    unique_ptr<GPU> coregpu;
 	    unique_ptr<Input> coreinput;
+	    unique_ptr<Timers> coretimers;
 	    unique_ptr<CPU> corecpu;
 
 	    bool init();
