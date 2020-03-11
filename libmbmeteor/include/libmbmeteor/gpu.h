@@ -192,23 +192,33 @@ namespace gba
 
 			struct BGAffine
 			{
-			    int pa = 1;
-			    int pb = 0;
-			    int pc = 0;
-			    int pd = 1;
-			    int x = 0;
-			    int y = 0;
-			    int cx = 0;
-			    int cy = 0;
+			    int16_t pa = 1;
+			    int16_t pb = 0;
+			    int16_t pc = 0;
+			    int16_t pd = 1;
+			    int32_t x = 0;
+			    int32_t y = 0;
+			    int32_t cx = 0;
+			    int32_t cy = 0;
 			};
 
 			void setcx(int layernum)
 			{
-			    bgaff[layernum].cx = (bgaff[layernum].x & 0x7FFFF00);
+			    bgaff[layernum].cx = (bgaff[layernum].x & 0x7FFFFFF);
 
 			    if (TestBit(bgaff[layernum].x, 27))
 			    {
-				bgaff[layernum].cx *= -1;
+				bgaff[layernum].cx |= 0xF0000000;
+			    }
+			}
+			
+			void setcy(int layernum)
+			{
+			    bgaff[layernum].cy = (bgaff[layernum].y & 0x7FFFFFF);
+
+			    if (TestBit(bgaff[layernum].y, 27))
+			    {
+				bgaff[layernum].cy |= 0xF0000000;
 			    }
 			}
 

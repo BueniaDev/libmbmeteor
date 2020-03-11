@@ -129,7 +129,7 @@ namespace gba
 		case 0x2C: bgaff[0].y = ((bgaff[0].y & 0xFFFFFF00) | value); break;
 		case 0x2D: bgaff[0].y = ((bgaff[0].y & 0xFFFF00FF) | (value << 8)); break;
 		case 0x2E: bgaff[0].y = ((bgaff[0].y & 0xFF00FFFF) | (value << 16)); break;
-		case 0x2F: bgaff[0].y = ((bgaff[0].y & 0x00FFFFFF) | ((value & 0xF) << 24)); break;
+		case 0x2F: bgaff[0].y = ((bgaff[0].y & 0x00FFFFFF) | ((value & 0xF) << 24)); setcy(0); break;
 		case 0x4D: objmosaic = value; break;		
 		case 0x50: blendcnt = ((blendcnt & 0xFF00) | value); break;
 		case 0x51: blendcnt = (((value & 0x3F) << 8) | (blendcnt & 0xFF)); break;
@@ -154,6 +154,8 @@ namespace gba
 		scanlinecounter = 0;
 		vcount += 1;
 		hblank(false);
+		setcx(0);
+		setcy(0);
 
 		if (vcount == 160)
 		{
@@ -170,6 +172,10 @@ namespace gba
 		if (scanlinecounter == 960)
 		{
 		    renderscanline();
+			
+			bgaff[0].cx += bgaff[0].pb;
+			bgaff[0].cy += bgaff[0].pd;
+			
 		    hblank(true);
 		}
 	    }
@@ -228,7 +234,7 @@ namespace gba
 			
 			if (!rotandscale && doublesize)
 			{
-				// continue;
+				continue;
 			}
 			
 			int shape = (attrib0 >> 14);
@@ -339,10 +345,10 @@ namespace gba
 			
 			bool horizontalflip = false;
 			bool verticalflip = false;
-			int pa = 0;
-			int pb  = 0;
-			int pc = 0;
-			int pd = 0;
+			int16_t pa = 0;
+			int16_t pb  = 0;
+			int16_t pc = 0;
+			int16_t pd = 0;
 			
 			if (rotandscale)
 			{
@@ -745,7 +751,128 @@ namespace gba
 
 	void GPU::renderbgaff(int layernum)
 	{
+    if (layernum < 2)
+    {
+        return;
+    }
+	
+	if (!TestBit(dispcnt, (8 + layernum)))
+	{
+		return;
+	}
 
+    uint16_t bgcnt = getbgcontrol(layernum);
+    int size = (bgcnt >> 14);
+    
+    int sbb = ((bgcnt >> 8) & 0x1F);
+    int cbb = ((bgcnt >> 2) & 0x3);
+    
+    int mapbase = (sbb << 11);
+    int tilebase = (cbb << 14);
+    
+    int bgsize = (128 << size);
+	
+	int maplineshift = (size + 4);
+	
+	BGAffine temp = bgaff[(layernum - 2)];
+	
+	int32_t refx = temp.cx;
+	int32_t refy = temp.cy;
+	
+	int16_t pa = temp.pa;
+	int16_t pc = temp.pc;
+	
+	for (int i = 0; i < 240; i++)
+	{
+		bool isbackdrop = false;
+		
+		uint32_t xpos = i;
+		uint32_t ypos = vcount;
+		
+		cout << "REGX: " << dec << (int)((refx >> 8)) << endl;
+		cout << "REGY: " << dec << (int)((refy >> 8)) << endl;
+		cout << "X: " << dec << (int)(xpos) << endl;
+		cout << "Y: " << dec << (int)(ypos) << endl;
+		
+		refx += pa;
+		refy += pc;
+		
+		if (xpos >= bgsize)
+		{
+			if (TestBit(bgcnt, 13))
+			{
+				xpos &= (bgsize - 1);
+			}
+			else
+			{
+				isbackdrop = true;
+			}
+		}
+		else if (xpos < 0)
+		{
+			if (TestBit(bgcnt, 13))
+			{
+				xpos = size + (xpos & (size - 1));
+			}
+			else
+			{
+				isbackdrop = true;
+			}
+		}
+		
+		if (ypos >= bgsize)
+		{
+			if (TestBit(bgcnt, 13))
+			{
+				ypos &= (bgsize - 1);
+			}
+			else
+			{
+				isbackdrop = true;
+			}
+		}
+		else if (ypos < 0)
+		{
+			if (TestBit(bgcnt, 13))
+			{
+				ypos = size + (ypos & (size - 1));
+			}
+			else
+			{
+				isbackdrop = true;
+			}
+		}
+		
+		if (isbackdrop)
+		{
+			setpixel(layernum, i, 0x8000);
+			continue;
+		}
+	
+	
+        int mapcol = (xpos >> 3);
+        int mapline = (ypos >> 3);
+        
+        int tilecol = (xpos & 7);
+        int tileline = (ypos & 7);
+        
+        int mapaddr = mapbase + (mapline << maplineshift) + mapcol;
+        
+        uint8_t tilenum = gpumem.vram[mapaddr];
+        
+        int tileaddr = tilebase + (tilenum << 6) + (tileline << 3) + tilecol;
+        
+        uint16_t paladdr = gpumem.vram[tileaddr];
+        
+        if (paladdr == 0)
+        {
+            setpixel(layernum, i, 0x8000);
+            continue;
+        }
+        
+        uint16_t color = (readpram16(paladdr) & 0x7FFF);
+        setpixel(layernum, i, color);
+	}
 	}
 
 	void GPU::renderbitmap(int layernum, int mode)
