@@ -61,10 +61,9 @@ namespace gba
 
 	    void keypadirq(bool val)
 	    {
-		inputmem.writeLong(0x3007FF8, BitChange(inputmem.readLong(0x3007FF8), 12, val));
-		
 		if (val)
 		{
+		    inputmem.writeLong(0x3007FF8, BitSet(inputmem.readLong(0x3007FF8), 12));
 		    inputmem.setinterrupt(12);
 		}
 	    }

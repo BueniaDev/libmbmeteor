@@ -51,7 +51,17 @@ namespace gba
 			
 			int scanlinecounter = 0;
 			int pixelx = 0;
-			int lcdmode;
+			
+
+			enum Phase : int
+			{
+			    Scanline = 0,
+			    HBlank = 1,
+			    VBlankScanline = 2,
+			    VBlankHBlank = 3,
+			};
+
+			Phase phase = Phase::Scanline;
 			
 			void updatevcount();
 
@@ -192,10 +202,10 @@ namespace gba
 
 			struct BGAffine
 			{
-			    int16_t pa = 1;
+			    int16_t pa = 0x100;
 			    int16_t pb = 0;
 			    int16_t pc = 0;
-			    int16_t pd = 1;
+			    int16_t pd = 0x100;
 			    int32_t x = 0;
 			    int32_t y = 0;
 			    int32_t cx = 0;
@@ -204,7 +214,7 @@ namespace gba
 
 			void setcx(int layernum)
 			{
-			    bgaff[layernum].cx = (bgaff[layernum].x & 0x7FFFFFF);
+			    bgaff[layernum].cx = (bgaff[layernum].x & 0xFFFFFFF);
 
 			    if (TestBit(bgaff[layernum].x, 27))
 			    {
@@ -214,7 +224,7 @@ namespace gba
 			
 			void setcy(int layernum)
 			{
-			    bgaff[layernum].cy = (bgaff[layernum].y & 0x7FFFFFF);
+			    bgaff[layernum].cy = (bgaff[layernum].y & 0xFFFFFFF);
 
 			    if (TestBit(bgaff[layernum].y, 27))
 			    {
@@ -222,8 +232,131 @@ namespace gba
 			    }
 			}
 
+			void affhblank()
+			{
+			    bgaff[0].cx += bgaff[0].pb;
+			    bgaff[0].cy += bgaff[0].pd;
+			    bgaff[1].cx += bgaff[1].pb;
+			    bgaff[1].cy += bgaff[1].pd;
+			}
+
+			void affvblank()
+			{
+			    setcx(0);
+			    setcy(0);
+			    setcx(1);
+			    setcy(1);
+			}
+
 			BGAffine bgaff[2];
 
+			struct WindowControl
+			{
+			    int layerenableflags = 0;
+			    bool specialeffect = false;
+
+			    uint8_t read()
+			    {
+				return ((specialeffect << 5) | layerenableflags);
+			    }
+
+			    void write(uint8_t val)
+			    {
+				layerenableflags = (val & 0x1F);
+				specialeffect = TestBit(val, 5);
+			    }
+			};
+
+			struct WindowSize
+			{
+			    int startx = 0;
+			    int endx = 0;
+			    int starty = 0;
+			    int endy = 0;
+
+			    void write(int addr, uint8_t val)
+			    {
+				switch (addr)
+				{
+				    case 0: endx = val; break;
+				    case 1: startx = val; break;
+				    case 2: endy = val; break;
+				    case 3: starty = val; break;
+				}
+			    }
+
+			    bool insidewindow(int x, int y)
+			    {
+				if (startx <= endx)
+				{
+				    if ((x < startx) || (x >= endx))
+				    {
+					return false;
+				    }
+				}
+				else
+				{
+				    if ((x >= endx) && (x < startx))
+				    {
+					return false;
+				    }
+				}
+
+				if (starty <= endy)
+				{
+				    if ((y < starty) || (y >= endy))
+				    {
+					return false;
+				    }
+				}
+				else
+				{
+				    if ((y >= endy) && (y < starty))
+				    {
+					return false;
+				    }
+				}
+
+				return true;
+			    }
+			};
+
+			void getwindow(int objmode, int x, int y, WindowControl &window)
+			{
+			    if ((dispcnt >> 13) == 0)
+			    {
+				window.layerenableflags = 0x1F;
+				window.specialeffect = true;
+				return;
+			    }
+
+			    for (int i = 0; i < 2; i++)
+			    {
+				if (TestBit(dispcnt, (13 + i)) && insidewindow(i, x, y))
+				{
+				    window = winctrl[i];
+				    return;
+				}
+			    }
+
+			    if (TestBit(dispcnt, 15) && TestBit(objmode, 1))
+			    {
+				window = winctrl[3];
+				return;
+			    }
+
+			    window = winctrl[2];
+			}
+
+			bool insidewindow(int i, int x, int y)
+			{
+			    return winsize[i].insidewindow(x, y);
+			}
+
+			WindowControl winctrl[4];
+			WindowSize winsize[2];
+
+			uint8_t bgmosaic = 0;
 			uint8_t objmosaic = 0;
 
 			uint16_t blendcnt = 0;
@@ -291,9 +424,8 @@ namespace gba
 
 			    if (TestBit(dispstat, 3))
 			    {
-			        gpumem.writeLong(0x3007FF8, BitChange(gpumem.readLong(0x3007FF8), 0, val));
-
-				if (val)
+				gpumem.writeLong(0x3007FF8, BitChange(gpumem.readLong(0x3007FF8), 0, val));
+			        if (val)
 				{
 				    gpumem.setinterrupt(0);
 				}
@@ -306,11 +438,24 @@ namespace gba
 
 			    if (TestBit(dispstat, 4))
 			    {
-			        gpumem.writeLong(0x3007FF8, BitChange(gpumem.readLong(0x3007FF8), 1, val));
-				
-				if (val)
+				gpumem.writeLong(0x3007FF8, BitChange(gpumem.readLong(0x3007FF8), 1, val));
+			        if (val)
 				{
 				    gpumem.setinterrupt(1);
+				}
+			    }
+			}
+
+			void vcountset(bool val)
+			{
+			    dispstat = BitChange(dispstat, 2, val);
+
+			    if (TestBit(dispstat, 5))
+			    {
+				gpumem.writeLong(0x3007FF8, BitChange(gpumem.readLong(0x3007FF8), 2, val));
+				if (val)
+				{
+				    gpumem.setinterrupt(2);
 				}
 			    }
 			}

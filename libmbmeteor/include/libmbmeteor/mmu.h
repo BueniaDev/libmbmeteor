@@ -101,6 +101,11 @@ namespace gba
 		    return (carttype == CartridgeType::CartFlash128K);
 		}
 
+		bool isflash64k()
+		{
+		    return (carttype == CartridgeType::CartFlash64K);
+		}
+
 	    uint8_t readByte(uint32_t addr);
 	    void writeByte(uint32_t addr, uint8_t val);
 	    uint16_t readWord(uint32_t addr);
@@ -134,12 +139,16 @@ namespace gba
 	    uint8_t readflash128k(uint32_t addr);
 	    void writeflash128k(uint32_t addr, uint8_t val);
 
+	    uint8_t readflash64k(uint32_t addr);
+	    void writeflash64k(uint32_t addr, uint8_t val);
+
 	    int flashstate = 0;
 	    bool flashgrabid = false;
 	    bool flashswitch = false;
 	    bool flashwrite = false;
 	    int flash128kbank = 0;
 	    uint16_t flash128id = 0x09C2; // Macronix 128K Flash ROM ID
+	    uint16_t flash64id = 0x1B32; // Panasonic 64K Flash ROM ID
 
 	    void softwareinterrupt();
 
@@ -148,6 +157,11 @@ namespace gba
 	    bool interruptmasterenable = false;
 
 	    uint16_t waitcnt = 0;
+
+	    void setinterruptmirror(int num, bool val)
+	    {
+		writeLong(0x3007FF8, BitChange(readLong(0x3007FF8), num, val));
+	    }
 
 	    void setinterrupt(int num)
 	    {
@@ -204,503 +218,450 @@ namespace gba
 	    DmaState dma2state = DmaState::Inactive;
 	    DmaState dma3state = DmaState::Inactive;
 
-	    void initdma0()
+	    void decdmaunits(int num)
 	    {
-		if (dma0state == DmaState::Inactive)
+		switch ((num & 0x3))
 		{
-		    if (TestBit(dma0control, 15))
-		    {
-			dma0oldsrc = dma0src;
-			dma0olddst = dma0dst;
-			dma0src &= ~(TestBit(dma0control, 10) ? 3 : 1);
-			dma0dst &= ~(TestBit(dma0control, 10) ? 3 : 1);
-
-			dma0unitstocopy = (dma0length == 0) ? 0x4000 : dma0length;
-			dma0oldlength = dma0unitstocopy;
-
-			cout << "DMA3 source: " << hex << (int)(dma3src) << endl;
-			cout << "DMA3 destination: " << hex << (int)(dma3dst) << endl;
-			cout << "DMA3 length: " << dec << (int)(dma3unitstocopy) << endl;
-			
-			int dma0starttiming = ((dma0control >> 12) & 0x3);
-
-			switch (dma0starttiming)
-			{
-			    case 0: dma0state = DmaState::Starting; break;
-			    case 2: break;
-			    default: cout << "Unrecognized DMA0 start timing of " << dec << (int)(dma0starttiming) << endl; exit(1); break;
-			}
-		    }
+		    case 0: dma0unitstocopy -= 1; break;
+		    case 1: dma1unitstocopy -= 1; break;
+		    case 2: dma2unitstocopy -= 1; break;
+		    case 3: dma3unitstocopy -= 1; break;
 		}
-		else
-		{
-		    
-		}	
 	    }
 
-	    void initdma1()
+	    uint32_t getdmasrc(int num)
 	    {
-		if (dma1state == DmaState::Inactive)
+		uint32_t temp;
+
+		switch ((num & 0x3))
 		{
-		    if (TestBit(dma1control, 15))
+		    case 0: temp = dma0src; break;
+		    case 1: temp = dma1src; break;
+		    case 2: temp = dma2src; break;
+		    case 3: temp = dma3src; break;
+		}
+
+		return temp;
+	    }
+
+	    uint32_t getdmadst(int num)
+	    {
+		uint32_t temp;
+
+		switch ((num & 0x3))
+		{
+		    case 0: temp = dma0dst; break;
+		    case 1: temp = dma1dst; break;
+		    case 2: temp = dma2dst; break;
+		    case 3: temp = dma3dst; break;
+		}
+
+		return temp;
+	    }
+
+	    uint32_t getdmacontrol(int num)
+	    {
+		uint32_t temp;
+
+		switch ((num & 0x3))
+		{
+		    case 0: temp = dma0control; break;
+		    case 1: temp = dma1control; break;
+		    case 2: temp = dma2control; break;
+		    case 3: temp = dma3control; break;
+		}
+
+		return temp;
+	    }
+
+	    void disabledma(int num)
+	    {
+		switch ((num & 0x3))
+		{
+		    case 0: dma0control = BitReset(dma0control, 15); break;
+		    case 1: dma1control = BitReset(dma1control, 15); break;
+		    case 2: dma2control = BitReset(dma2control, 15); break;
+		    case 3: dma3control = BitReset(dma3control, 15); break;
+		}
+	    }
+
+	    DmaState getdmastate(int num)
+	    {
+		DmaState temp;
+
+		switch ((num & 0x3))
+		{
+		    case 0: temp = dma0state; break;
+		    case 1: temp = dma1state; break;
+		    case 2: temp = dma2state; break;
+		    case 3: temp = dma3state; break;
+		}
+
+		return temp;
+	    }
+
+	    void setdmastate(int num, DmaState val)
+	    {
+		switch ((num & 0x3))
+		{
+		    case 0: dma0state = val; break;
+		    case 1: dma1state = val; break;
+		    case 2: dma2state = val; break;
+		    case 3: dma3state = val; break;
+		}
+	    }
+
+	    void aligndma(int num)
+	    {
+		switch ((num & 0x3))
+		{
+		    case 0:
+		    {
+			dma0src &= ~(TestBit(dma0control, 10) ? 3 : 1);
+			dma0dst &= ~(TestBit(dma0control, 10) ? 3 : 1);
+		    }
+		    break;
+		    case 1:
 		    {
 			dma1src &= ~(TestBit(dma1control, 10) ? 3 : 1);
 			dma1dst &= ~(TestBit(dma1control, 10) ? 3 : 1);
-
-			dma1unitstocopy = (dma1length == 0) ? 0x4000 : dma1length;
-			
-			int dma1starttiming = ((dma1control >> 12) & 0x3);
-
-			switch (dma1starttiming)
-			{
-			    case 0: dma1state = DmaState::Starting; break;
-			    default: break;
-			}
 		    }
-		}
-		else
-		{
-		    cout << "Restarting DMA1 transfer..." << endl;
-		    exit(1);
-		}	
-	    }
-
-	    void initdma2()
-	    {
-		if (dma2state == DmaState::Inactive)
-		{
-		    if (TestBit(dma2control, 15))
+		    break;
+		    case 2:
 		    {
 			dma2src &= ~(TestBit(dma2control, 10) ? 3 : 1);
 			dma2dst &= ~(TestBit(dma2control, 10) ? 3 : 1);
-
-			dma2unitstocopy = (dma2length == 0) ? 0x4000 : dma2length;
-			
-			int dma2starttiming = ((dma2control >> 12) & 0x3);
-
-			switch (dma2starttiming)
-			{
-			    case 0: dma2state = DmaState::Starting; break;
-			    default: break;
-			}
 		    }
-		}
-		else
-		{
-		    cout << "Restarting DMA2 transfer..." << endl;
-		    exit(1);
-		}	
-	    }
-
-	    void initdma3()
-	    {
-		if (dma3state == DmaState::Inactive)
-		{
-		    if (TestBit(dma3control, 15))
+		    break;
+		    case 3:
 		    {
 			dma3src &= ~(TestBit(dma3control, 10) ? 3 : 1);
 			dma3dst &= ~(TestBit(dma3control, 10) ? 3 : 1);
+		    }
+		    break;
+		}
+	    }
 
-			dma3unitstocopy = (dma3length == 0) ? 0x10000 : dma3length;
-			cout << "DMA3 source: " << hex << (int)(dma3src) << endl;
-			cout << "DMA3 destination: " << hex << (int)(dma3dst) << endl;
-			cout << "DMA3 length: " << dec << (int)(dma3unitstocopy << (1 + TestBit(dma3control, 10))) << endl;
+	    int getdmaunits(int num)
+	    {
+		int temp;
 
-			
+		switch ((num & 0x3))
+		{
+		    case 0: temp = dma0unitstocopy; break;
+		    case 1: temp = dma1unitstocopy; break;
+		    case 2: temp = dma2unitstocopy; break;
+		    case 3: temp = dma3unitstocopy; break;
+		}
 
-			if ((dma3dst >> 24) == 0xD)
+		return temp;
+	    }
+
+	    void incdma(int num, int control, bool dst)
+	    {
+		int increment = (dmainc(control, dst) << (1 + TestBit(getdmacontrol(num), 10)));
+
+		switch ((num & 0x3))
+		{
+		    case 0:
+		    {
+			if (dst)
 			{
-			    if (((dma3unitstocopy == 17) || (dma3unitstocopy == 81)) && !eepromlock)
-			    {
-				eeprombitsize = 14;
-				eeprombitmask = 0x3FF;
-				gameeeprom.clear();
-				gameeeprom.resize(0x2000, 0);
-				eepromlock = true;
-			    }
+			    dma0dst += increment;
 			}
-			
-			int dma3starttiming = ((dma3control >> 12) & 0x3);
-
-			switch (dma3starttiming)
+			else
 			{
-			    case 0: dma3state = DmaState::Starting; break;
-			    default: cout << "Unrecognized DMA3 start timing of " << dec << (int)(dma3starttiming) << endl; exit(1); break;
+			    dma0src += increment;
 			}
+		    }
+		    break;
+		    case 1:
+		    {
+			if (dst)
+			{
+			    dma1dst += increment;
+			}
+			else
+			{
+			    dma1src += increment;
+			}
+		    }
+		    break;
+		    case 2:
+		    {
+			if (dst)
+			{
+			    dma2dst += increment;
+			}
+			else
+			{
+			    dma2src += increment;
+			}
+		    }
+		    break;
+		    case 3:
+		    {
+			if (dst)
+			{
+			    dma3dst += increment;
+			}
+			else
+			{
+			    dma3src += increment;
+			}
+		    }
+		    break;
+		}
+	    }
+
+	    int dmainc(int num, bool dst)
+	    {
+		int temp = 0;
+	
+		switch ((num & 0x3))
+		{
+		    case 0: temp = 1; break;
+		    case 1: temp = -1; break;
+		    case 2: temp = 0; break;
+		    case 3:
+		    {
+			if (dst)
+			{
+			    temp = 1;
+			}
+			else
+			{
+			    cout << "Prohibited" << endl;
+			    exit(1);
+			}
+		    }
+		    break;
+		}
+
+		return temp;
+	    }
+
+	    void resetdmadst(int num, uint32_t val)
+	    {
+		switch ((num & 0x3))
+		{
+		    case 0: dma0dst -= val; break;
+		    case 1: dma1dst -= val; break;
+		    case 2: dma2dst -= val; break;
+		    case 3: dma3dst -= val; break;
+		}
+	    }
+
+	    void resetdmalength(int num)
+	    {
+		switch ((num & 0x3))
+		{
+		    case 0: dma0unitstocopy = (dma0length == 0) ? 0x4000 : dma0length; break;
+		    case 1: dma1unitstocopy = (dma1length == 0) ? 0x4000 : dma1length; break;
+		    case 2: dma2unitstocopy = (dma2length == 0) ? 0x4000 : dma2length; break;
+		    case 3: dma3unitstocopy = (dma3length == 0) ? 0x10000 : dma3length; break;
+		}		
+	    }
+
+	    uint32_t getdmalength(int num)
+	    {
+		uint32_t temp;
+
+		switch ((num & 0x3))
+		{
+		    case 0: temp = (dma0length == 0) ? 0x4000 : dma0length; break;
+		    case 1: temp = (dma1length == 0) ? 0x4000 : dma1length; break;
+		    case 2: temp = (dma2length == 0) ? 0x4000 : dma2length; break;
+		    case 3: temp = (dma3length == 0) ? 0x10000 : dma3length; break;
+		}
+
+		return temp;
+	    }
+
+	    bool isvblank()
+	    {
+		uint16_t dispstat = readWord(0x4000004);
+
+		return TestBit(dispstat, 0);
+	    }
+
+	    bool ishblank()
+	    {
+		uint16_t dispstat = readWord(0x4000004);
+
+		return TestBit(dispstat, 1);
+	    }
+
+	    void signalhblank()
+	    {
+		for (int i = 0; i < 4; i++)
+		{
+		    if (getdmastate(i) == DmaState::Paused)
+		    {
+			resetdmalength(i);
+			setdmastate(i, DmaState::Starting);
+		    }
+		}
+	    }
+
+	    void signalvblank()
+	    {
+		for (int i = 0; i < 4; i++)
+		{
+		    if (getdmastate(i) == DmaState::Paused)
+		    {
+			resetdmalength(i);
+			setdmastate(i, DmaState::Starting);
+		    }
+		}
+	    }
+
+	    void setupdma(int num)
+	    {
+		aligndma(num);
+		resetdmalength(num);
+
+		if ((num == 3) && (getdmadst(num) >> 24) == 0xD)
+		{
+		    if (((getdmaunits(num) == 17) || (getdmaunits(num) == 81)) && !eepromlock)
+		    {
+			eeprombitsize = 14;
+			eeprombitmask = 0x3FF;
+			gameeeprom.clear();
+			gameeeprom.resize(0x2000, 0);
+			eepromlock = true;
+		    }
+		}
+
+		int starttiming = ((getdmacontrol(num) >> 12) & 0x3);
+
+		switch (starttiming)
+		{
+		    case 0: setdmastate(num, DmaState::Starting); break;
+		    case 1: setdmastate(num, (isvblank() ? DmaState::Starting : DmaState::Paused)); break;
+		    case 2: setdmastate(num, (ishblank() ? DmaState::Starting : DmaState::Paused)); break;
+		}
+	    }
+
+	    void enddma(int num)
+	    {
+		setdmastate(num, DmaState::Inactive);
+		disabledma(num);
+
+		if (TestBit(getdmacontrol(num), 14))
+		{
+		    cout << "DMA IRQ" << endl;
+		    // setinterrupt((8 + num));
+		}
+	    }
+
+	    void updatedma(int num)
+	    {
+		if (getdmastate(num) == DmaState::Starting)
+		{
+		    setdmastate(num, DmaState::Active);
+		}
+		else if (getdmastate(num) == DmaState::Active)
+		{
+		    executedma(num);
+
+		    if (getdmaunits(num) == 0)
+		    {
+			int dstcontrol = ((getdmacontrol(num) >> 5) & 0x3);
+			int dmaunits = getdmalength(num);
+
+			if (dstcontrol == 3)
+			{
+			    resetdmadst(num, (dmaunits << (1 + TestBit(getdmacontrol(num), 10))));
+			}
+
+			if (!TestBit(getdmacontrol(num), 9))
+			{
+			    enddma(num);
+			}
+			else
+			{
+			   setdmastate(num, DmaState::Paused);
+			}
+		    }
+		}
+	    }
+
+	    void initdma(int num)
+	    {
+		if (getdmastate(num) == DmaState::Inactive)
+		{
+		    if (TestBit(getdmacontrol(num), 15))
+		    {
+			setupdma(num);
 		    }
 		}
 		else
 		{
-		    cout << "Restarting DMA3 transfer..." << endl;
-		    exit(1);
-		}	
+		    if (TestBit(getdmacontrol(num), 15))
+		    {
+			setupdma(num);
+		    }
+		    else
+		    {
+			enddma(num);
+		    }
+		}
 	    }
 
-	    bool dma0inprogress()
+	    void executedma(int num)
 	    {
-		return ((dma0state == DmaState::Starting) || (dma0state == DmaState::Active));
-	    }
+		if (TestBit(getdmacontrol(num), 10))
+		{
+		    int srccontrol = ((getdmacontrol(num) >> 7) & 0x3);
+		    int dstcontrol = ((getdmacontrol(num) >> 5) & 0x3);
 
-	    bool dma1inprogress()
-	    {
-		return ((dma1state == DmaState::Starting) || (dma1state == DmaState::Active));
-	    }
+		    writeLong(getdmadst(num), readLong(getdmasrc(num)));
 
-	    bool dma2inprogress()
-	    {
-		return ((dma2state == DmaState::Starting) || (dma2state == DmaState::Active));
-	    }
+		    incdma(num, dstcontrol, true);
+		    incdma(num, srccontrol, false);
+		}
+		else
+		{
+		    int srccontrol = ((getdmacontrol(num) >> 7) & 0x3);
+		    int dstcontrol = ((getdmacontrol(num) >> 5) & 0x3);
 
-	    bool dma3inprogress()
-	    {
-		return ((dma3state == DmaState::Starting) || (dma3state == DmaState::Active));
+		    writeWord(getdmadst(num), readWord(getdmasrc(num)));
+
+		    incdma(num, dstcontrol, true);
+		    incdma(num, srccontrol, false);
+		}		
+
+		decdmaunits(num);
 	    }
 
 	    bool dmainprogress()
 	    {
-		return (dma0inprogress() || dma1inprogress() || dma2inprogress() || dma3inprogress());
+		bool temp = false;
+
+		for (int i = 0; i < 4; i++)
+		{
+		    temp |= dmainprogress(i);
+		}
+
+		return temp;
+	    }
+
+	    bool dmainprogress(int num)
+	    {
+		return ((getdmastate(num) == DmaState::Starting) || (getdmastate(num) == DmaState::Active));
 	    }
 
 	    void updatedma()
 	    {
-		updatedma0();
-		updatedma1();
-		updatedma2();
-		updatedma3();
-	    }
-
-	    void updatedma0()
-	    {
-		if (dma0state == DmaState::Starting)
+		for (int i = 0; i < 4; i++)
 		{
-		    dma0state = DmaState::Active;
-		}
-		else if (dma0state == DmaState::Active)
-		{
-		    executedma0();
-
-		    if (dma0unitstocopy == 0)
+		    if (dmainprogress(i))
 		    {
-			if (!TestBit(dma0control, 9))
-			{
-			    dma0state = DmaState::Inactive;
-			    dma0control = BitReset(dma0control, 15);
-
-			    if (TestBit(dma0control, 14))
-			    {
-				cout << "DMA0 IRQ" << endl;
-			    }
-			}
-			else
-			{
-			    dma0state = DmaState::Paused;
-			    dma0src = dma0oldsrc;
-			    dma0dst = dma0olddst;
-			    dma0unitstocopy = dma0oldlength;
-			}
+			updatedma(i);
+			return;
 		    }
 		}
-	    }
-
-	    void executedma0()
-	    {
-		if (TestBit(dma0control, 10))
-		{
-		    int srccontrol = ((dma0control >> 7) & 0x3);
-		    int dstcontrol = ((dma0control >> 5) & 0x3);
-
-		    writeLong(dma0dst, readLong(dma0src));
-
-		    switch (dstcontrol)
-		    {
-			case 0: dma0dst += 4; break;
-			case 1: dma0dst -= 4; break;
-			case 2: break;
-			case 3: cout << "Increment/Reload" << endl; exit(1); break;
-		    }
-
-		    switch (srccontrol)
-		    {
-			case 0: dma0src += 4; break;
-			case 1: dma0src -= 4; break;
-			case 2: break;
-			case 3: cout << "Prohibited" << endl; exit(1); break;
-		    }
-		}
-		else
-		{
-		    int srccontrol = ((dma0control >> 7) & 0x3);
-		    int dstcontrol = ((dma0control >> 5) & 0x3);
-
-		    writeWord(dma0dst, readWord(dma0src));
-
-		    switch (dstcontrol)
-		    {
-			case 0: dma0dst += 2; break;
-			case 1: dma0dst -= 2; break;
-			case 2: break;
-			case 3: break;
-		    }
-
-		    switch (srccontrol)
-		    {
-			case 0: dma0src += 2; break;
-			case 1: dma0src -= 2; break;
-			case 2: break;
-			case 3: break;
-		    }
-		}		
-
-		dma0unitstocopy -= 1;
-	    }
-
-	    void updatedma1()
-	    {
-		if (dma1state == DmaState::Starting)
-		{
-		    dma1state = DmaState::Active;
-		}
-		else if (dma1state == DmaState::Active)
-		{
-		    executedma1();
-
-		    if (dma1unitstocopy == 0)
-		    {
-			if (!TestBit(dma1control, 9))
-			{
-			    dma1state = DmaState::Inactive;
-			    dma1control = BitReset(dma1control, 15);
-
-			    if (TestBit(dma1control, 14))
-			    {
-				cout << "DMA1 IRQ" << endl;
-			    }
-			}
-			else
-			{
-			    cout << "Repeating DMA transfer..." << endl;
-			    exit(1);
-			}
-		    }
-		}
-	    }
-
-	    void executedma1()
-	    {
-		if (TestBit(dma1control, 10))
-		{
-		    int srccontrol = ((dma1control >> 7) & 0x3);
-		    int dstcontrol = ((dma1control >> 5) & 0x3);
-
-		    writeLong(dma1dst, readLong(dma1src));
-
-		    switch (dstcontrol)
-		    {
-			case 0: dma1dst += 4; break;
-			case 1: dma1dst -= 4; break;
-			case 2: break;
-			case 3: cout << "Increment/Reload" << endl; exit(1); break;
-		    }
-
-		    switch (srccontrol)
-		    {
-			case 0: dma1src += 4; break;
-			case 1: dma1src -= 4; break;
-			case 2: break;
-			case 3: cout << "Prohibited" << endl; exit(1); break;
-		    }
-		}
-		else
-		{
-		    int srccontrol = ((dma1control >> 7) & 0x3);
-		    int dstcontrol = ((dma1control >> 5) & 0x3);
-
-		    writeWord(dma1dst, readWord(dma1src));
-
-		    switch (dstcontrol)
-		    {
-			case 0: dma1dst += 2; break;
-			case 1: dma1dst -= 2; break;
-			case 2: break;
-			case 3: break;
-		    }
-
-		    switch (srccontrol)
-		    {
-			case 0: dma1src += 2; break;
-			case 1: dma1src -= 2; break;
-			case 2: break;
-			case 3: break;
-		    }
-		}		
-
-		dma1unitstocopy -= 1;
-	    }
-
-	    void updatedma2()
-	    {
-		if (dma2state == DmaState::Starting)
-		{
-		    dma2state = DmaState::Active;
-		}
-		else if (dma2state == DmaState::Active)
-		{
-		    executedma2();
-
-		    if (dma2unitstocopy == 0)
-		    {
-			if (!TestBit(dma2control, 9))
-			{
-			    dma2state = DmaState::Inactive;
-			    dma2control = BitReset(dma2control, 15);
-
-			    if (TestBit(dma2control, 14))
-			    {
-				cout << "DMA2 IRQ" << endl;
-			    }
-			}
-			else
-			{
-			    cout << "Repeating DMA transfer..." << endl;
-			    exit(1);
-			}
-		    }
-		}
-	    }
-
-	    void executedma2()
-	    {
-		if (TestBit(dma2control, 10))
-		{
-		    int srccontrol = ((dma2control >> 7) & 0x3);
-		    int dstcontrol = ((dma2control >> 5) & 0x3);
-
-		    writeLong(dma2dst, readLong(dma2src));
-
-		    switch (dstcontrol)
-		    {
-			case 0: dma2dst += 4; break;
-			case 1: dma2dst -= 4; break;
-			case 2: break;
-			case 3: cout << "Increment/Reload" << endl; exit(1); break;
-		    }
-
-		    switch (srccontrol)
-		    {
-			case 0: dma2src += 4; break;
-			case 1: dma2src -= 4; break;
-			case 2: break;
-			case 3: cout << "Prohibited" << endl; exit(1); break;
-		    }
-		}
-		else
-		{
-		    int srccontrol = ((dma2control >> 7) & 0x3);
-		    int dstcontrol = ((dma2control >> 5) & 0x3);
-
-		    writeWord(dma2dst, readWord(dma2src));
-
-		    switch (dstcontrol)
-		    {
-			case 0: dma2dst += 2; break;
-			case 1: dma2dst -= 2; break;
-			case 2: break;
-			case 3: break;
-		    }
-
-		    switch (srccontrol)
-		    {
-			case 0: dma2src += 2; break;
-			case 1: dma2src -= 2; break;
-			case 2: break;
-			case 3: break;
-		    }
-		}		
-
-		dma2unitstocopy -= 1;
-	    }
-
-	    void updatedma3()
-	    {
-		if (dma3state == DmaState::Starting)
-		{
-		    dma3state = DmaState::Active;
-		}
-		else if (dma3state == DmaState::Active)
-		{
-		    executedma3();
-
-		    if (dma3unitstocopy == 0)
-		    {
-			if (!TestBit(dma3control, 9))
-			{
-			    dma3state = DmaState::Inactive;
-			    dma3control = BitReset(dma3control, 15);
-
-			    if (TestBit(dma3control, 14))
-			    {
-				cout << "DMA3 IRQ" << endl;
-			    }
-			}
-			else
-			{
-			    cout << "Repeating DMA transfer..." << endl;
-			    exit(1);
-			}
-		    }
-		}
-	    }
-
-	    void executedma3()
-	    {
-		if (TestBit(dma3control, 10))
-		{
-		    int srccontrol = ((dma3control >> 7) & 0x3);
-		    int dstcontrol = ((dma3control >> 5) & 0x3);
-
-		    writeLong(dma3dst, readLong(dma3src));
-
-		    switch (dstcontrol)
-		    {
-			case 0: dma3dst += 4; break;
-			case 1: dma3dst -= 4; break;
-			case 2: break;
-			case 3: cout << "Increment/Reload" << endl; exit(1); break;
-		    }
-
-		    switch (srccontrol)
-		    {
-			case 0: dma3src += 4; break;
-			case 1: dma3src -= 4; break;
-			case 2: break;
-			case 3: cout << "Prohibited" << endl; exit(1); break;
-		    }
-		}
-		else
-		{
-		    int srccontrol = ((dma3control >> 7) & 0x3);
-		    int dstcontrol = ((dma3control >> 5) & 0x3);
-
-		    writeWord(dma3dst, readWord(dma3src));
-
-		    switch (dstcontrol)
-		    {
-			case 0: dma3dst += 2; break;
-			case 1: dma3dst -= 2; break;
-			case 2: break;
-			case 3: cout << "Increment/Reload" << endl; exit(1); break;
-		    }
-
-		    switch (srccontrol)
-		    {
-			case 0: dma3src += 2; break;
-			case 1: dma3src -= 2; break;
-			case 2: break;
-			case 3: cout << "Prohibited" << endl; exit(1); break;
-		    }
-		}		
-
-		dma3unitstocopy -= 1;
 	    }
 
 	    bool loadBIOS(string filename);
@@ -712,6 +673,7 @@ namespace gba
 		CartSRAM = 0,
 		CartEEPROM = 1,
 		CartFlash128K = 2,
+		CartFlash64K = 3,
 	    };
 
 	    CartridgeType carttype;
@@ -726,6 +688,7 @@ namespace gba
 		    if (strncmp((const char*)&rom[i], "SRAM_V", 6) == 0)
 		    {
 			type = CartridgeType::CartSRAM;
+			return type;
 		    }
 		}
 
@@ -734,6 +697,7 @@ namespace gba
 		    if (strncmp((const char*)&rom[i], "EEPROM_V", 8) == 0)
 		    {
 			type = CartridgeType::CartEEPROM;
+			return type;
 		    }
 		}
 
@@ -742,10 +706,27 @@ namespace gba
 		    if (strncmp((const char*)&rom[i], "FLASH1M_V", 9) == 0)
 		    {
 			type = CartridgeType::CartFlash128K;
+			return type;
 		    }
 		}
 
-		cout << dec << (int)(type) << endl;
+		for (int i = 0; i < (int)(rom.size() - 11); i++)
+		{
+		    if (strncmp((const char*)&rom[i], "FLASH512_V", 10) == 0)
+		    {
+			type = CartridgeType::CartFlash64K;
+			return type;
+		    }
+		}
+
+		for (int i = 0; i < (int)(rom.size() - 8); i++)
+		{
+		    if (strncmp((const char*)&rom[i], "FLASH_V", 7) == 0)
+		    {
+			type = CartridgeType::CartFlash64K;
+			return type;
+		    }
+		}
 
 		return type;
 	    }

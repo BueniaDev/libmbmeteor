@@ -72,7 +72,11 @@ namespace gba
 		case 0xD: temp = (bg2cnt >> 8); break;
 		case 0xE: temp = (bg3cnt & 0xFF); break;
 		case 0xF: temp = (bg3cnt >> 8); break;
-		default: cout << "Unrecognized GPU read of " << hex << (int)((addr & 0x5F)) << endl; temp = 0xFF; break;
+		case 0x48: temp = winctrl[0].read(); break;
+		case 0x49: temp = winctrl[1].read(); break;
+		case 0x4A: temp = winctrl[2].read(); break;
+		case 0x4B: temp = winctrl[3].read(); break;
+		default: cout << "Unrecognized GPU read of " << hex << (int)((addr & 0xFF)) << endl; temp = 0xFF; break;
 	    }
 
 	    return temp;
@@ -122,14 +126,43 @@ namespace gba
 		case 0x25: bgaff[0].pc = ((bgaff[0].pc & 0x00FF) | (value << 8)); break;
 		case 0x26: bgaff[0].pd = ((bgaff[0].pd & 0xFF00) | value); break;
 		case 0x27: bgaff[0].pd = ((bgaff[0].pd & 0x00FF) | (value << 8)); break;
-		case 0x28: bgaff[0].x = ((bgaff[0].x & 0xFFFFFF00) | value); break;
-		case 0x29: bgaff[0].x = ((bgaff[0].x & 0xFFFF00FF) | (value << 8)); break;
-		case 0x2A: bgaff[0].x = ((bgaff[0].x & 0xFF00FFFF) | (value << 16)); break;
+		case 0x28: bgaff[0].x = ((bgaff[0].x & 0x0FFFFF00) | value); break;
+		case 0x29: bgaff[0].x = ((bgaff[0].x & 0x0FFF00FF) | (value << 8)); break;
+		case 0x2A: bgaff[0].x = ((bgaff[0].x & 0x0F00FFFF) | (value << 16)); break;
 		case 0x2B: bgaff[0].x = ((bgaff[0].x & 0x00FFFFFF) | ((value & 0xF) << 24)); setcx(0); break;
-		case 0x2C: bgaff[0].y = ((bgaff[0].y & 0xFFFFFF00) | value); break;
-		case 0x2D: bgaff[0].y = ((bgaff[0].y & 0xFFFF00FF) | (value << 8)); break;
-		case 0x2E: bgaff[0].y = ((bgaff[0].y & 0xFF00FFFF) | (value << 16)); break;
+		case 0x2C: bgaff[0].y = ((bgaff[0].y & 0x0FFFFF00) | value); break;
+		case 0x2D: bgaff[0].y = ((bgaff[0].y & 0x0FFF00FF) | (value << 8)); break;
+		case 0x2E: bgaff[0].y = ((bgaff[0].y & 0x0F00FFFF) | (value << 16)); break;
 		case 0x2F: bgaff[0].y = ((bgaff[0].y & 0x00FFFFFF) | ((value & 0xF) << 24)); setcy(0); break;
+		case 0x30: bgaff[1].pa = ((bgaff[1].pa & 0xFF00) | value); break;
+		case 0x31: bgaff[1].pa = ((bgaff[1].pa & 0x00FF) | (value << 8)); break;
+		case 0x32: bgaff[1].pb = ((bgaff[1].pb & 0xFF00) | value); break;
+		case 0x33: bgaff[1].pb = ((bgaff[1].pb & 0x00FF) | (value << 8)); break;
+		case 0x34: bgaff[1].pc = ((bgaff[1].pc & 0xFF00) | value); break;
+		case 0x35: bgaff[1].pc = ((bgaff[1].pc & 0x00FF) | (value << 8)); break;
+		case 0x36: bgaff[1].pd = ((bgaff[1].pd & 0xFF00) | value); break;
+		case 0x37: bgaff[1].pd = ((bgaff[1].pd & 0x00FF) | (value << 8)); break;
+		case 0x38: bgaff[1].x = ((bgaff[1].x & 0x0FFFFF00) | value); break;
+		case 0x39: bgaff[1].x = ((bgaff[1].x & 0x0FFF00FF) | (value << 8)); break;
+		case 0x3A: bgaff[1].x = ((bgaff[1].x & 0x0F00FFFF) | (value << 16)); break;
+		case 0x3B: bgaff[1].x = ((bgaff[1].x & 0x00FFFFFF) | ((value & 0xF) << 24)); setcx(1); break;
+		case 0x3C: bgaff[1].y = ((bgaff[1].y & 0x0FFFFF00) | value); break;
+		case 0x3D: bgaff[1].y = ((bgaff[1].y & 0x0FFF00FF) | (value << 8)); break;
+		case 0x3E: bgaff[1].y = ((bgaff[1].y & 0x0F00FFFF) | (value << 16)); break;
+		case 0x3F: bgaff[1].y = ((bgaff[1].y & 0x00FFFFFF) | ((value & 0xF) << 24)); setcy(1); break;
+		case 0x40: winsize[0].write(0, value); break;
+		case 0x41: winsize[0].write(1, value); break;
+		case 0x42: winsize[1].write(0, value); break;
+		case 0x43: winsize[1].write(1, value); break;
+		case 0x44: winsize[0].write(2, value); break;
+		case 0x45: winsize[0].write(3, value); break;
+		case 0x46: winsize[1].write(2, value); break;
+		case 0x47: winsize[1].write(3, value); break;
+		case 0x48: winctrl[0].write(value); break;
+		case 0x49: winctrl[1].write(value); break;
+		case 0x4A: winctrl[2].write(value); break;
+		case 0x4B: winctrl[3].write(value); break;
+		case 0x4C: bgmosaic = value; break;
 		case 0x4D: objmosaic = value; break;		
 		case 0x50: blendcnt = ((blendcnt & 0xFF00) | value); break;
 		case 0x51: blendcnt = (((value & 0x3F) << 8) | (blendcnt & 0xFF)); break;
@@ -137,7 +170,7 @@ namespace gba
 		case 0x53: blendevb = (value & 0x1F); break;
 		case 0x54: blendevy = (value & 0x1F); break;
 		case 0x55: return; break;
-		default: cout << "Unrecognized GPU write of " << hex << (int)((addr & 0x5F)) << endl; break;
+		default: cout << "Unrecognized GPU write of " << hex << (int)((addr & 0xFF)) << endl; break;
 	    }
 	}
 	
@@ -149,41 +182,91 @@ namespace gba
 	
 	void GPU::updatevcount()
 	{
-	    if (scanlinecounter == 1232)
+	    switch (phase)
 	    {
-		scanlinecounter = 0;
-		vcount += 1;
-		hblank(false);
-		setcx(0);
-		setcy(0);
+		case Phase::Scanline:
+		{
+		    if (scanlinecounter == 1006)
+		    {
+			gpumem.signalhblank();
+			hblank(true);
+			phase = Phase::HBlank;
+		    }
+		}
+		break;
+		case Phase::HBlank:
+		{
+		    if (scanlinecounter == 1232)
+		    {
+			scanlinecounter = 0;
+			hblank(false);
 
-		if (vcount == 160)
-		{
-		    vblank(true);
+			bool vcountflag = ++vcount == (dispstat >> 8);
+
+			vcountset(vcountflag);
+
+			if (vcount == 160)
+			{
+			    gpumem.signalvblank();
+			    vblank(true);
+			    affvblank();
+			    phase = Phase::VBlankScanline;
+			}
+			else
+			{
+			    affhblank();
+			    renderscanline();
+			    phase = Phase::Scanline;
+			}
+		    }
 		}
-		else if (vcount == 228)
+		break;
+		case Phase::VBlankScanline:
 		{
-		    vblank(false);
-		    vcount = 0;
+		    if (scanlinecounter == 1006)
+		    {
+			hblank(true);
+			phase = Phase::VBlankHBlank;
+		    }
 		}
-	    }
-	    else if (scanlinecounter <= 960)
-	    {
-		if (scanlinecounter == 960)
+		break;
+		case Phase::VBlankHBlank:
 		{
-		    renderscanline();
-			
-			bgaff[0].cx += bgaff[0].pb;
-			bgaff[0].cy += bgaff[0].pd;
-			
-		    hblank(true);
+		    if (scanlinecounter == 1232)
+		    {
+			scanlinecounter = 0;
+			hblank(false);
+
+			bool vcountflag = false;
+
+			if (vcount == 227)
+			{
+			    vcount = 0;
+			    vcountflag = ((dispstat >> 8) == 0);
+			    renderscanline();
+			    phase = Phase::Scanline;
+			}
+			else
+			{
+			    phase = Phase::VBlankScanline;
+
+			    if (vcount == 226)
+			    {
+				vblank(false);
+			    }
+
+			    vcountflag = ++vcount == (dispstat >> 8);
+			}
+
+			vcountset(vcountflag);
+		    }
 		}
 	    }
 	}
 
 	void GPU::renderscanline()
 	{
-	    if (((dispcnt >> 8) & 0x1F) == 0)
+	    if ((dispcnt >> 8) == 0)
 	    {
 		return;
 	    }
@@ -507,6 +590,10 @@ namespace gba
 		int objinfo = objinfobuffer[i];
 		int objpriority = (objinfo & 0x3);
 		int objmode = (objinfo >> 2);
+
+		WindowControl window;
+		getwindow(objmode, i, vcount, window);
+
 		uint16_t firstcolor = backcolor;
 		uint16_t secondcolor = backcolor;
 
@@ -518,6 +605,11 @@ namespace gba
 
 		for (int layer : bglayers)
 		{
+		    if (!TestBit(window.layerenableflags, layer))
+		    {
+			continue;
+		    }
+	
 		    uint16_t layercolor = (layer == 4) ? objbuffer[i] : getpixel(layer, i);
 
 		    if (layercolor == 0x8000)
@@ -551,7 +643,7 @@ namespace gba
 		{
 			firstcolor = alphablendeffect(firstcolor, secondcolor);
 		}
-		else
+		else if (window.specialeffect)
 		{
 
 		switch (blendspec)
@@ -688,6 +780,11 @@ namespace gba
 		bgmapbase += 1024 << (totalwidth & ~0xFF ? 2 : 1);
 	    }
 
+	    if (TestBit(bgcnt, 6))
+	    {
+		ypos -= (ypos & (bgmosaic >> 4));
+	    }
+
 	    int tilerow = ((ypos >> 3) << 5);
 	    int tline = (ypos & 7);
 
@@ -701,6 +798,11 @@ namespace gba
 		{
 		    xpos &= 255;
 		    map += (1024 << 1);
+		}
+
+		if (TestBit(bgcnt, 6))
+		{
+		    xpos -= (xpos & (bgmosaic & 0xF));
 		}
 
 		int tilecol = (xpos >> 3);
@@ -783,70 +885,38 @@ namespace gba
 	int16_t pc = temp.pc;
 	
 	for (int i = 0; i < 240; i++)
-	{
-		bool isbackdrop = false;
+	{	
+		int32_t xpos = refx + pa * i >> 8;
+		int32_t ypos = refy + pc * i >> 8;
 		
-		uint32_t xpos = i;
-		uint32_t ypos = vcount;
-		
-		cout << "REGX: " << dec << (int)((refx >> 8)) << endl;
-		cout << "REGY: " << dec << (int)((refy >> 8)) << endl;
-		cout << "X: " << dec << (int)(xpos) << endl;
-		cout << "Y: " << dec << (int)(ypos) << endl;
-		
-		refx += pa;
-		refy += pc;
-		
-		if (xpos >= bgsize)
+		if ((xpos < 0) || (xpos >= bgsize) || (ypos < 0) || (ypos >= bgsize))
 		{
-			if (TestBit(bgcnt, 13))
+		    if (TestBit(bgcnt, 13))
+		    {
+			xpos %= bgsize;
+			ypos %= bgsize;
+
+			if (xpos < 0)
 			{
-				xpos &= (bgsize - 1);
+			    xpos += bgsize;
 			}
-			else
+
+			if (ypos < 0)
 			{
-				isbackdrop = true;
+			    ypos += bgsize;
 			}
-		}
-		else if (xpos < 0)
-		{
-			if (TestBit(bgcnt, 13))
-			{
-				xpos = size + (xpos & (size - 1));
-			}
-			else
-			{
-				isbackdrop = true;
-			}
-		}
-		
-		if (ypos >= bgsize)
-		{
-			if (TestBit(bgcnt, 13))
-			{
-				ypos &= (bgsize - 1);
-			}
-			else
-			{
-				isbackdrop = true;
-			}
-		}
-		else if (ypos < 0)
-		{
-			if (TestBit(bgcnt, 13))
-			{
-				ypos = size + (ypos & (size - 1));
-			}
-			else
-			{
-				isbackdrop = true;
-			}
-		}
-		
-		if (isbackdrop)
-		{
+		    }
+		    else
+		    {
 			setpixel(layernum, i, 0x8000);
 			continue;
+		    }
+		}
+
+		if (TestBit(bgcnt, 6))
+		{
+		    xpos -= (xpos & (bgmosaic & 0xF));
+		    ypos -= (ypos & (bgmosaic >> 4));
 		}
 	
 	
@@ -886,12 +956,20 @@ namespace gba
 	    {
 		uint16_t color = 0x7FFF;
 
+		BGAffine temp = bgaff[(layernum - 2)];
+
+		int32_t refx = temp.cx;
+		int32_t refy = temp.cy;
+	
+		int16_t pa = temp.pa;
+		int16_t pc = temp.pc;
+
 		switch (mode)
 		{
 		    case 0:
 		    {
-			int xpos = (bgaff[(layernum - 2)].pa * i) >> 8;
-			int ypos = (bgaff[(layernum - 2)].pd * vcount) >> 8;
+			int xpos = (refx + pa * i) >> 8;
+			int ypos = (refy + pc * i) >> 8;
 			int pixeltemp = ((xpos * 2) + (ypos * 480));
 
 			if (pixeltemp >= 0x12C00)
@@ -904,10 +982,10 @@ namespace gba
 		    break;
 		    case 1:
 		    {
-			int xpos = (bgaff[(layernum - 2)].pa * i) >> 8;
-			int ypos = (bgaff[(layernum - 2)].pd * vcount) >> 8;
+			int xpos = (refx + pa * i) >> 8;
+			int ypos = (refy + pc * i) >> 8;
 			uint16_t frameoffs = TestBit(dispcnt, 4) ? 0xA000 : 0;
-			int pixeltemp = (i + (vcount * 240));
+			int pixeltemp = (xpos + (ypos * 240));
 
 			if (pixeltemp >= 0x9600)
 			{
@@ -926,8 +1004,8 @@ namespace gba
 		    break;
 		    case 2:
 		    {
-			int xpos = (bgaff[(layernum - 2)].pa * i) >> 8;
-			int ypos = (bgaff[(layernum - 2)].pd * vcount) >> 8;
+			int xpos = (refx + pa * i) >> 8;
+			int ypos = (refy + pc * i) >> 8;
 			uint16_t frameoffs = TestBit(dispcnt, 4) ? 0xA000 : 0;
 			int pixeltemp = ((xpos * 2) + (ypos * 320));
 

@@ -196,11 +196,9 @@ namespace gba
 		{
 		    temp = readflash128k(addr);
 		}
-		else
+		else if (isflash64k())
 		{
-		    cout << "Unrecognized read from address of " << hex << (int)(addr) << endl;
-		    memarm.printregs();
-		    exit(1);
+		    temp = readflash64k(addr);
 		}
 	    }
 	    break;
@@ -300,11 +298,9 @@ namespace gba
 		{
 		    writeflash128k(addr, val);
 		}
-		else
+		else if (isflash64k())
 		{
-		    cout << "Unrecognized write of " << hex << (int)(val) << " to address of " << hex << (int)(addr) << endl;
-		    memarm.printregs();
-		    exit(1);
+		    writeflash64k(addr, val);
 		}		
 	    }
 	    break;
@@ -413,6 +409,91 @@ namespace gba
 		    case 0xB0:
 		    {
 			flashswitch = true;
+			flashstate = 0;
+		    }
+		    break;
+		    case 0xF0:
+		    {
+			flashgrabid = false;
+			flashstate = 0;
+		    }
+		    break;
+		    default: cout << "Unrecognized flash command of " << hex << (int)(val) << endl; exit(1); break;
+		}
+	    }
+	}
+	else if (addr == 0xE002AAA)
+	{
+	    if ((val == 0x55) && (flashstate == 1))
+	    {
+		flashstate += 1;
+	    }
+	}
+    }
+
+    uint8_t MMU::readflash64k(uint32_t addr)
+    {
+	uint8_t temp = 0;
+
+	if ((addr == 0xE000000) && (flashgrabid))
+	{
+	    temp = (flash64id & 0xFF);
+	}
+	else if ((addr == 0xE000001) && (flashgrabid))
+	{
+	    temp = (flash64id >> 8);
+	}
+	else
+	{
+	    temp = gameflash[(addr & 0xFFFF)];
+	}
+
+	return temp;
+    }
+
+    void MMU::writeflash64k(uint32_t addr, uint8_t val)
+    {
+	if (flashwrite && ((addr >= 0xE000000) && (addr < 0xE010000)))
+	{
+	    gameflash[(addr & 0xFFFF)] = val;
+	    flashwrite = false;
+	}
+	else if ((addr & 0xFFF0FFF) == 0xE000000)
+	{
+	    if ((val == 0x30) && (flashstate == 2))
+	    {
+		for (int i = addr; i < (int)(addr + 0x1000); i++)
+		{
+		    gameflash[(i & 0xFFFF)] = 0xFF;
+		}
+
+		flashstate = 0;
+	    }
+	}
+	else if (addr == 0xE005555)
+	{
+	    if ((val == 0xAA) && (flashstate == 0))
+	    {
+		flashstate += 1;
+	    }
+	    else if (flashstate == 2)
+	    {
+		switch (val)
+		{
+		    case 0x80:
+		    {
+			flashstate = 0;
+		    }
+		    break;
+		    case 0x90:
+		    {
+			flashgrabid = true;
+			flashstate = 0;
+		    }
+		    break;
+		    case 0xA0:
+		    {
+			flashwrite = true;
 			flashstate = 0;
 		    }
 		    break;
@@ -683,7 +764,7 @@ namespace gba
 	    case 0xB8: dma0length = ((dma0length & 0xFF00) | val); break;
 	    case 0xB9: dma0length = ((dma0length & 0xFF) | (val << 8)); break;
 	    case 0xBA: dma0control = ((dma0control & 0xFF00) | val); break;
-	    case 0xBB: dma0control = ((dma0control & 0xFF) | (val << 8)); initdma0(); break;
+	    case 0xBB: dma0control = ((dma0control & 0xFF) | (val << 8)); initdma(0); break;
 	    case 0xBC: dma1src = ((dma1src & 0xFFFFFF00) | val); break;
 	    case 0xBD: dma1src = ((dma1src & 0xFFFF00FF) | (val << 8)); break;
 	    case 0xBE: dma1src = ((dma1src & 0xFF00FFFF) | (val << 16)); break;
@@ -695,7 +776,7 @@ namespace gba
 	    case 0xC4: dma1length = ((dma1length & 0xFF00) | val); break;
 	    case 0xC5: dma1length = ((dma1length & 0xFF) | (val << 8)); break;
 	    case 0xC6: dma1control = ((dma1control & 0xFF00) | val); break;
-	    case 0xC7: dma1control = ((dma1control & 0xFF) | (val << 8)); initdma1(); break;
+	    case 0xC7: dma1control = ((dma1control & 0xFF) | (val << 8)); initdma(1); break;
 	    case 0xC8: dma2src = ((dma2src & 0xFFFFFF00) | val); break;
 	    case 0xC9: dma2src = ((dma2src & 0xFFFF00FF) | (val << 8)); break;
 	    case 0xCA: dma2src = ((dma2src & 0xFF00FFFF) | (val << 16)); break;
@@ -707,7 +788,7 @@ namespace gba
 	    case 0xD0: dma2length = ((dma2length & 0xFF00) | val); break;
 	    case 0xD1: dma2length = ((dma2length & 0xFF) | (val << 8)); break;
 	    case 0xD2: dma2control = ((dma2control & 0xFF00) | val); break;
-	    case 0xD3: dma2control = ((dma2control & 0xFF) | (val << 8)); initdma2(); break;
+	    case 0xD3: dma2control = ((dma2control & 0xFF) | (val << 8)); initdma(2); break;
 	    case 0xD4: dma3src = ((dma3src & 0xFFFFFF00) | val); break;
 	    case 0xD5: dma3src = ((dma3src & 0xFFFF00FF) | (val << 8)); break;
 	    case 0xD6: dma3src = ((dma3src & 0xFF00FFFF) | (val << 16)); break;
@@ -719,7 +800,7 @@ namespace gba
 	    case 0xDC: dma3length = ((dma3length & 0xFF00) | val); break;
 	    case 0xDD: dma3length = ((dma3length & 0xFF) | (val << 8)); break;
 	    case 0xDE: dma3control = ((dma3control & 0xFF00) | val); break;
-	    case 0xDF: dma3control = ((dma3control & 0xFF) | (val << 8)); initdma3(); break;
+	    case 0xDF: dma3control = ((dma3control & 0xFF) | (val << 8)); initdma(3); break;
 	    default: cout << "Unrecognized DMA write to " << hex << (int)(addr) << ", value of " << hex << (int)(val) << endl; return; break;
 	}
     }
@@ -752,6 +833,11 @@ namespace gba
 		case CartridgeType::CartFlash128K:
 		{
 		    gameflash.resize(0x20000, 0xFF);
+		}
+		break;
+		case CartridgeType::CartFlash64K:
+		{
+		    gameflash.resize(0x10000, 0xFF);
 		}
 		break;
 		case CartridgeType::None: break;

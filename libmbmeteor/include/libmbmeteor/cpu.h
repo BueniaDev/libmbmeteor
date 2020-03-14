@@ -182,22 +182,6 @@ namespace gba
 
 	    void softwareinterrupt(uint32_t val)
 	    {
-		uint8_t temp = 0;
-
-		if ((mem.memarm.instmode == mem.memarm.armmode))
-		{
-		    temp = (val >> 16); 
-		}
-		else
-		{
-		    temp = (val & 0xFF);
-		}
-
-		if (temp == 0xE)
-		{
-		    isswi = true;
-		}
-
 		mem.softwareinterrupt();
 	    }
     };
@@ -234,7 +218,6 @@ namespace gba
 	    {
 		while (cycles > 0)
 		{
-
 		    if (mem.dmainprogress())
 		    {
 			mem.updatedma();
