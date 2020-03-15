@@ -391,14 +391,14 @@ namespace gba
 				verticalsize <<= 1;
 			}
 			
-			int ypos = (attrib0 & 0xFF);
+			int32_t ypos = (attrib0 & 0xFF);
 			
 			if (ypos >= 160)
 			{
 				ypos -= 256;
 			}
 			
-			int objecty = (vcount - ypos);
+			int32_t objecty = (vcount - ypos);
 			
 			if ((objecty < 0) || (objecty >= verticalsize))
 			{
@@ -419,7 +419,7 @@ namespace gba
 				vertsizemask = (verticalsize - 1);
 			}
 			
-			int xpos = (attrib1 & 0x1FF);
+			int32_t xpos = (attrib1 & 0x1FF);
 			
 			if (xpos >= 240)
 			{
@@ -449,10 +449,10 @@ namespace gba
 			{
 				horizontalflip = TestBit(attrib1, 12);
 				verticalflip = TestBit(attrib1, 13);
-				pa = 0;
+				pa = 0x100;
 				pb = 0;
 				pc = 0;
-				pd = 0;
+				pd = 0x100;
 			}
 			
 			int mode = ((attrib0 >> 10) & 0x3);
@@ -523,6 +523,7 @@ namespace gba
 				int tiley = sampley & 7;
 				
 				int tileaddr = tilenum;
+
 				
 				if (TestBit(dispcnt, 6))
 				{
@@ -533,13 +534,18 @@ namespace gba
 					tileaddr += (mapx << singlepal) + (mapy << 5);
 				}
 				
-				tileaddr <<= 5;
-				
+				tileaddr <<= 5;	
+
 				tileaddr += tilebase;
 				
 				tileaddr += tilex + (tiley << 3) >> (1 - singlepal);
 				
 				int paletteaddr = 0;
+
+				if ((tileaddr >= 0x18000) && (tilebase == 0x14000))
+				{
+				    tileaddr -= 0x4000; // Disabling this breaks sprite rendering in Spongebob Squarepants: Battle For Bikini Bottom and Barbie Groovy Games
+				}
 				
 				if (singlepal)
 				{
@@ -555,7 +561,6 @@ namespace gba
 				else
 				{
 					int paletteindex = gpumem.vram[tileaddr] >> (TestBit(tilex, 0) << 2) & 0xF;
-
 					if (paletteindex == 0)
 					{
 						continue;
