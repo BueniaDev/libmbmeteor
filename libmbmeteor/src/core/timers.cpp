@@ -69,19 +69,19 @@ namespace gba
 	{
 	    case 0x100: timer0reload = ((timer0reload & 0xFF00) | val); break;
 	    case 0x101: timer0reload = ((val << 8) | (timer0reload & 0xFF)); break;
-	    case 0x102: timer0control = val; inittimer(0); break;
+	    case 0x102: inittimer(0, val); break;
 	    case 0x103: return; break;
 	    case 0x104: timer1reload = ((timer1reload & 0xFF00) | val); break;
 	    case 0x105: timer1reload = ((val << 8) | (timer1reload & 0xFF)); break;
-	    case 0x106: timer1control = val; inittimer(1); break;
+	    case 0x106: inittimer(1, val); break;
 	    case 0x107: return; break;
 	    case 0x108: timer2reload = ((timer2reload & 0xFF00) | val); break;
 	    case 0x109: timer2reload = ((val << 8) | (timer2reload & 0xFF)); break;
-	    case 0x10A: timer2control = val; inittimer(2); break;
+	    case 0x10A: inittimer(2, val); break;
 	    case 0x10B: return; break;
 	    case 0x10C: timer3reload = ((timer3reload & 0xFF00) | val); break;
 	    case 0x10D: timer3reload = ((val << 8) | (timer3reload & 0xFF)); break;
-	    case 0x10E: timer3control = val; inittimer(3); break;
+	    case 0x10E: inittimer(3, val); break;
 	    case 0x10F: return; break;
 	    default: cout << "Unrecognized timer write of " << hex << (int)((addr & 0xFFF)) << endl; exit(1); break;
 	}
@@ -91,38 +91,31 @@ namespace gba
     {
 	if (TestBit(timer0control, 7))
 	{
-	    if (TestBit(timer0control, 2))
+	    timer0cycles += 1;
+
+	    if (timer0cycles == timer0prescaler)
 	    {
-		return;
-	    }
-	    else
-	    {
-		int timerprescaler = 0;
+		timer0cycles = 0;
 
-		switch ((timer0control & 0x3))
+		if (!TestBit(timer0control, 2))
 		{
-		    case 0: timerprescaler = 1; break;
-		    case 1: timerprescaler = 64; break;
-		    case 2: timerprescaler = 256; break;
-		    case 3: timerprescaler = 1024; break;
-		}
-
-		timer0cycles += 1;
-
-		if (timer0cycles == timerprescaler)
-		{
-		    timer0cycles = 0;
-
 		    timer0counter += 1;
 
 		    if (timer0counter == 0)
 		    {
 			timer0counter = timer0reload;
 
+			if (TestBit(timer1control, 2))
+			{
+			    timer1counter += 1;
+			}
+
 			if (TestBit(timer0control, 6))
 			{
 			    timerirq(0);
 			}
+
+			// cout << "Audio FIFO, timer 0" << endl;
 		    }
 		}
 	    }
@@ -133,9 +126,13 @@ namespace gba
     {
 	if (TestBit(timer1control, 7))
 	{
-	    if (TestBit(timer1control, 2))
+	    timer1cycles += 1;
+
+	    if (timer1cycles == timer1prescaler)
 	    {
-		if (timer0counter == 0xFFFF)
+		timer1cycles = 0;
+
+		if (!TestBit(timer1control, 2))
 		{
 		    timer1counter += 1;
 
@@ -143,41 +140,17 @@ namespace gba
 		    {
 			timer1counter = timer1reload;
 
-			if (TestBit(timer1control, 6))
+			if (TestBit(timer2control, 2))
 			{
-			    timerirq(1);
+			    timer2counter += 1;
 			}
-		    }
-		}
-	    }
-	    else
-	    {
-		int timerprescaler = 0;
-
-		switch ((timer1control & 0x3))
-		{
-		    case 0: timerprescaler = 1; break;
-		    case 1: timerprescaler = 64; break;
-		    case 2: timerprescaler = 256; break;
-		    case 3: timerprescaler = 1024; break;
-		}
-
-		timer1cycles += 1;
-
-		if (timer1cycles == timerprescaler)
-		{
-		    timer1cycles = 0;
-
-		    timer1counter += 1;
-
-		    if (timer1counter == 0)
-		    {
-			timer1counter = timer1reload;
 
 			if (TestBit(timer1control, 6))
 			{
 			    timerirq(1);
 			}
+
+			// cout << "Audio FIFO, timer 1" << endl;
 		    }
 		}
 	    }
@@ -188,9 +161,13 @@ namespace gba
     {
 	if (TestBit(timer2control, 7))
 	{
-	    if (TestBit(timer2control, 2))
+	    timer2cycles += 1;
+
+	    if (timer2cycles == timer2prescaler)
 	    {
-		if (timer1counter == 0xFFFF)
+		timer2cycles = 0;
+
+		if (!TestBit(timer2control, 2))
 		{
 		    timer2counter += 1;
 
@@ -198,36 +175,10 @@ namespace gba
 		    {
 			timer2counter = timer2reload;
 
-			if (TestBit(timer2control, 6))
+			if (TestBit(timer3control, 2))
 			{
-			    timerirq(2);
+			    timer3counter += 1;
 			}
-		    }
-		}
-	    }
-	    else
-	    {
-		int timerprescaler = 0;
-
-		switch ((timer2control & 0x3))
-		{
-		    case 0: timerprescaler = 1; break;
-		    case 1: timerprescaler = 64; break;
-		    case 2: timerprescaler = 256; break;
-		    case 3: timerprescaler = 1024; break;
-		}
-
-		timer2cycles += 1;
-
-		if (timer2cycles == timerprescaler)
-		{
-		    timer2cycles = 0;
-
-		    timer2counter += 1;
-
-		    if (timer2counter == 0)
-		    {
-			timer2counter = timer2reload;
 
 			if (TestBit(timer2control, 6))
 			{
@@ -243,41 +194,14 @@ namespace gba
     {
 	if (TestBit(timer3control, 7))
 	{
-	    if (TestBit(timer3control, 2))
+	    timer3cycles += 1;
+
+	    if (timer3cycles == timer3prescaler)
 	    {
-		if (timer2counter == 0xFFFF)
+		timer3cycles = 0;
+
+		if (!TestBit(timer3control, 2))
 		{
-		    timer3counter += 1;
-
-		    if (timer3counter == 0)
-		    {
-			timer3counter = timer3reload;
-
-			if (TestBit(timer3control, 6))
-			{
-			    timerirq(3);
-			}
-		    }
-		}
-	    }
-	    else
-	    {
-		int timerprescaler = 0;
-
-		switch ((timer3control & 0x3))
-		{
-		    case 0: timerprescaler = 1; break;
-		    case 1: timerprescaler = 64; break;
-		    case 2: timerprescaler = 256; break;
-		    case 3: timerprescaler = 1024; break;
-		}
-
-		timer3cycles += 1;
-
-		if (timer3cycles == timerprescaler)
-		{
-		    timer3cycles = 0;
-
 		    timer3counter += 1;
 
 		    if (timer3counter == 0)
