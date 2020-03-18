@@ -21,7 +21,7 @@ using namespace std::placeholders;
 
 namespace gba
 {
-    Timers::Timers(MMU& memory) : timermem(memory)
+    Timers::Timers(MMU& memory, APU& audio) : timermem(memory), timerapu(audio)
     {
 	for (int i = 0x100; i < 0x110; i++)
 	{
@@ -115,7 +115,8 @@ namespace gba
 			    timerirq(0);
 			}
 
-			// cout << "Audio FIFO, timer 0" << endl;
+			timerapu.consumesamplefifoa(0);
+			timerapu.consumesamplefifob(0);
 		    }
 		}
 	    }
@@ -150,7 +151,8 @@ namespace gba
 			    timerirq(1);
 			}
 
-			// cout << "Audio FIFO, timer 1" << endl;
+			timerapu.consumesamplefifoa(1);
+			timerapu.consumesamplefifob(1);
 		    }
 		}
 	    }

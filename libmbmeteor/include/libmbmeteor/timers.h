@@ -19,6 +19,7 @@
 
 #include "libmbmeteor_api.h"
 #include "mmu.h"
+#include "apu.h"
 #include <functional>
 using namespace gba;
 using namespace std;
@@ -28,10 +29,11 @@ namespace gba
     class LIBMBMETEOR_API Timers
     {
 	public:
-	    Timers(MMU& memory);
+	    Timers(MMU& memory, APU& audio);
 	    ~Timers();
 
 	    MMU& timermem;
+	    APU& timerapu;
 
 	    uint8_t readtimers(uint32_t addr);
 	    void writetimers(uint32_t addr, uint8_t value);
@@ -41,6 +43,7 @@ namespace gba
 	    uint8_t timer0control = 0;
 	    int timer0prescaler = 0;
 	    int timer0cycles = 0;
+	    uint64_t timer0clock = 0;
 
 	    uint16_t timer1counter = 0;
 	    uint16_t timer1reload = 0;
@@ -85,7 +88,7 @@ namespace gba
 			}
 
 
-			if (!TestBit(timer0control, 7) && prevenable)
+			if (!TestBit(timer0control, 7))
 			{
 			    timer0cycles = 0;
 			}
@@ -114,7 +117,7 @@ namespace gba
 			    timer1prescaler = 1;
 			}
 
-			if (!TestBit(timer1control, 7) && prevenable)
+			if (!TestBit(timer1control, 7))
 			{
 			    timer1cycles = 0;
 			}
@@ -143,7 +146,7 @@ namespace gba
 			    timer2prescaler = 1;
 			}
 
-			if (!TestBit(timer2control, 7) && prevenable)
+			if (!TestBit(timer2control, 7))
 			{
 			    timer2cycles = 0;
 			}
@@ -172,7 +175,7 @@ namespace gba
 			    timer3prescaler = 1;
 			}
 
-			if (!TestBit(timer3control, 7) && prevenable)
+			if (!TestBit(timer3control, 7))
 			{
 			    timer3cycles = 0;
 			}

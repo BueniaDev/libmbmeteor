@@ -768,7 +768,7 @@ namespace gba
 	    case 0xBC: dma1src = ((dma1src & 0xFFFFFF00) | val); break;
 	    case 0xBD: dma1src = ((dma1src & 0xFFFF00FF) | (val << 8)); break;
 	    case 0xBE: dma1src = ((dma1src & 0xFF00FFFF) | (val << 16)); break;
-	    case 0xBF: dma1src = ((dma1src & 0x00FFFFFF) | ((val & 0xF) << 24)); break;
+	    case 0xBF: dma1src = ((dma1src & 0x00FFFFFF) | ((val & 0xF) << 24)); dma1fifosrc = dma1src; break;
 	    case 0xC0: dma1dst = ((dma1dst & 0xFFFFFF00) | val); break;
 	    case 0xC1: dma1dst = ((dma1dst & 0xFFFF00FF) | (val << 8)); break;
 	    case 0xC2: dma1dst = ((dma1dst & 0xFF00FFFF) | (val << 16)); break;
@@ -780,7 +780,7 @@ namespace gba
 	    case 0xC8: dma2src = ((dma2src & 0xFFFFFF00) | val); break;
 	    case 0xC9: dma2src = ((dma2src & 0xFFFF00FF) | (val << 8)); break;
 	    case 0xCA: dma2src = ((dma2src & 0xFF00FFFF) | (val << 16)); break;
-	    case 0xCB: dma2src = ((dma2src & 0x00FFFFFF) | ((val & 0xF) << 24)); break;
+	    case 0xCB: dma2src = ((dma2src & 0x00FFFFFF) | ((val & 0xF) << 24)); dma2fifosrc = dma2src; break;
 	    case 0xCC: dma2dst = ((dma2dst & 0xFFFFFF00) | val); break;
 	    case 0xCD: dma2dst = ((dma2dst & 0xFFFF00FF) | (val << 8)); break;
 	    case 0xCE: dma2dst = ((dma2dst & 0xFF00FFFF) | (val << 16)); break;

@@ -25,6 +25,7 @@
 #include <utility>
 #include "mmu.h"
 #include "gpu.h"
+#include "apu.h"
 #include "input.h"
 #include "timers.h"
 #include <BeeARM/beearm.h>
@@ -38,12 +39,13 @@ namespace gba
     class LIBMBMETEOR_API CPUInterface : public BeeARMInterface
     {
 	public:
-	    CPUInterface(MMU& memory, GPU& graphics, Timers& timers);
+	    CPUInterface(MMU& memory, GPU& graphics, Timers& timers, APU& audio);
 	    ~CPUInterface();
 
 	    MMU& mem;
 	    GPU& gpu;
 	    Timers& timer;
+	    APU& apu;
 
 	    bool isswi = false;
 	    int clockcycles = 0;
@@ -82,94 +84,118 @@ namespace gba
 	    {
 		val = (val % 0x10000000);
 
+		int temp = 1;
+
 		if (val < 0x2000000)
 		{
-		    return 1;
+		    temp = 1;
 		}
 		else if (val < 0x2040000)
 		{
-		    return 3;
+		    temp = 3;
+		}
+		else if (val < 0x3000000)
+		{
+		    temp = 1;
+		}
+		else if (val < 0x4000000)
+		{
+		    temp = 1;
+		}
+		else if (val < 0x5000000)
+		{
+		    temp = 1;
+		}
+		else if (val < 0x6000000)
+		{
+		    temp = 1;
+		}
+		else if (val < 0x7000000)
+		{
+		    temp = 1;
 		}
 		else if (val < 0x8000000)
 		{
-		    return 1;
+		    temp = 1;
 		}
 		else if (val < 0xA000000)
 		{
 		    if (TestBit(flags, 1))
 		    {
-			int temp = 0;
+			int ftemp = 0;
 
 			int nonseq = ((mem.waitcnt >> 2) & 0x3);
 
 			switch (nonseq)
 			{
-			    case 0: temp = 5; break;
-			    case 1: temp = 4; break;
-			    case 2: temp = 3; break;
-			    case 3: temp = 9; break;
+			    case 0: ftemp = 5; break;
+			    case 1: ftemp = 4; break;
+			    case 2: ftemp = 3; break;
+			    case 3: ftemp = 9; break;
 			}
 
-			return temp;
+			temp = ftemp;
 		    }
 		    else
 		    {
-			return TestBit(mem.waitcnt, 4) ? 3 : 2;
+			temp = TestBit(mem.waitcnt, 4) ? 3 : 2;
 		    }
 		}
 		else if (val < 0xC000000)
 		{
 		    if (TestBit(flags, 1))
 		    {
-			int temp = 0;
+			int ftemp = 0;
 
 			int nonseq = ((mem.waitcnt >> 2) & 0x3);
 
 			switch (nonseq)
 			{
-			    case 0: temp = 5; break;
-			    case 1: temp = 4; break;
-			    case 2: temp = 3; break;
-			    case 3: temp = 9; break;
+			    case 0: ftemp = 5; break;
+			    case 1: ftemp = 4; break;
+			    case 2: ftemp = 3; break;
+			    case 3: ftemp = 9; break;
 			}
 
-			return temp;
+			temp = ftemp;
 		    }
 		    else
 		    {
-			return TestBit(mem.waitcnt, 4) ? 5 : 2;
+			temp = TestBit(mem.waitcnt, 7) ? 5 : 2;
 		    }
 		}
 		else if (val < 0xD000000)
 		{
-		    return 1;
+		    temp = 1;
 		}
 		else if (val < 0xE000000)
 		{
 		    if (mem.iseeprom())
 		    {
-			return 9;
+			temp = 9;
 		    }
 		    else
 		    {
-			return 1;
+			temp = 1;
 		    }
 		}
 		else if (val < 0xF000000)
 		{
-		    if (mem.issram())
+		    if (!mem.iseeprom())
 		    {
-			return 9;
+			temp = 9;
 		    }
 		    else
 		    {
-			return 1;
+			temp = 1;
 		    }
 		}
 		else
 		{
-		    return 1;
+		    temp = 1;
 		}
+
+		return temp;
 	    }
 
 	    void update()
@@ -178,6 +204,7 @@ namespace gba
 		gpu.updatelcd();
 		mem.updatedma();
 		timer.updatetimers();
+		apu.updateapu();
 	    }
 
 	    void softwareinterrupt(uint32_t val)
@@ -189,7 +216,7 @@ namespace gba
     class LIBMBMETEOR_API CPU
     {
 	public:
-	    CPU(MMU& memory, GPU& graphics, Input& input, Timers& timers);
+	    CPU(MMU& memory, GPU& graphics, Input& input, Timers& timers, APU& audio);
 	    ~CPU();
 
 	    void init();
@@ -199,6 +226,7 @@ namespace gba
 	    GPU& gpu;
 	    Input& joyp;
 	    Timers& timer;
+	    APU& apu;
 
 	    int tempcycles = 0;
 

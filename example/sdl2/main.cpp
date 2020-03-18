@@ -3,13 +3,17 @@
 #include <iostream>
 #include <sstream>
 #include <ctime>
+#include <functional>
+#include <cassert>
 using namespace gba;
 using namespace std;
+using namespace std::placeholders;
 
 GBACore core;
 
 SDL_Window *window = NULL;
-SDL_Surface *surface = NULL;
+SDL_Renderer *render = NULL;
+SDL_Texture *texture = NULL;
 
 int screenwidth = 240;
 int screenheight = 160;
@@ -25,9 +29,13 @@ void screenshot()
     screenstring.append(std::to_string(currenttime));
     screenstring.append(".bmp");
 
+    SDL_Surface *surface = SDL_CreateRGBSurfaceWithFormat(0, (screenwidth * scale), (screenheight * scale), 32, SDL_PIXELFORMAT_ARGB8888);
+    SDL_RenderReadPixels(render, NULL, SDL_PIXELFORMAT_ARGB8888, surface->pixels, surface->pitch);
+
     SDL_SaveBMP(surface, screenstring.c_str());
 
     cout << "Screenshot saved." << endl;
+    SDL_FreeSurface(surface);
 }
 
 bool initsdl()
@@ -38,7 +46,7 @@ bool initsdl()
 	return false;
     }
 
-    window = SDL_CreateWindow("mbmeteor-SDL2", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, (screenwidth * scale), (screenheight * scale), SDL_WINDOW_SHOWN);
+    window = SDL_CreateWindow("mbmeteor-SDL2", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, (screenwidth * scale), (screenheight * scale), SDL_WINDOW_OPENGL);
 
     if (window == NULL)
     {
@@ -46,7 +54,28 @@ bool initsdl()
 	return false;
     }
 
-    surface = SDL_GetWindowSurface(window);
+    render = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
+    SDL_RenderSetLogicalSize(render, 240, 160);    
+
+    if (render == NULL)
+    {
+	cout << "Renderer could not be created!" << endl;
+	return false;
+    }    
+
+    texture = SDL_CreateTexture(render, SDL_PIXELFORMAT_RGB24, SDL_TEXTUREACCESS_STREAMING, 240, 160);
+
+    SDL_AudioSpec audiospec;
+    audiospec.format = AUDIO_S16SYS;
+    audiospec.freq = 48000;
+    audiospec.samples = 4096;
+    audiospec.channels = 2;
+    audiospec.callback = NULL;
+
+    SDL_AudioSpec obtainedspec;
+    SDL_OpenAudio(&audiospec, &obtainedspec);
+    SDL_PauseAudio(0);
+
     return true;
 }
 
@@ -89,35 +118,46 @@ void processinput(SDL_Event event)
 
 void drawpixels()
 {
-    SDL_Rect pixel = {0, 0, scale, scale};
+    assert(render && texture);
+    SDL_UpdateTexture(texture, NULL, core.framebuffer(), (240 * sizeof(RGB)));
+    SDL_RenderClear(render);
+    SDL_RenderCopy(render, texture, NULL, NULL);
+    SDL_RenderPresent(render);
+}
 
-    for (int i = 0; i < screenwidth; i++)
+vector<int16_t> buffer;
+
+void sdlcallback(int16_t left, int16_t right)
+{
+    buffer.push_back(left);
+    buffer.push_back(right);
+
+    if (buffer.size() >= 4096)
     {
-	pixel.x = (i * scale);
+	buffer.clear();
 
-	for (int j = 0; j < screenheight; j++)
+	while ((SDL_GetQueuedAudioSize(1)) > (4096 * sizeof(int16_t)))
 	{
-	    pixel.y = (j * scale);
-
-	    uint8_t red = core.getpixel(i, j).red;
-	    uint8_t green = core.getpixel(i, j).green;
-	    uint8_t blue = core.getpixel(i, j).blue;
-
-	    SDL_FillRect(surface, &pixel, SDL_MapRGBA(surface->format, red, green, blue, 255));
+	    SDL_Delay(1);
 	}
+	SDL_QueueAudio(1, &buffer[0], (4096 * sizeof(int16_t)));
     }
-
-    SDL_UpdateWindowSurface(window);
 }
 
 void stopsdl()
 {
+    SDL_CloseAudio();
+    SDL_DestroyTexture(texture);
+    SDL_DestroyRenderer(render);
     SDL_DestroyWindow(window);
     SDL_Quit();
 }
 
 int main(int argc, char* argv[])
 {
+    core.setaudiocallback(bind(&sdlcallback, _1, _2));
+    core.setpixelcallback(bind(&drawpixels));
+
     if (!core.getoptions(argc, argv))
     {
 	return 1;
@@ -151,13 +191,12 @@ int main(int argc, char* argv[])
 	}
 
 	core.runcore();
-	drawpixels();
 
 	framecurrenttime = SDL_GetTicks();
 
-	if ((framecurrenttime - framestarttime) < 17)
+	if ((framecurrenttime - framestarttime) < 16)
 	{
-	    SDL_Delay(17 - (framecurrenttime - framestarttime));
+	    SDL_Delay(16 - (framecurrenttime - framestarttime));
 	}
 
 	framestarttime = SDL_GetTicks();

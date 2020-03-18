@@ -26,6 +26,8 @@ using namespace std;
 
 namespace gba
 {
+	using pixelfunc = function<void()>;
+
 	struct RGB
 	{
 	    uint8_t red;
@@ -45,12 +47,19 @@ namespace gba
 			MMU& gpumem;
 		
 			void updatelcd();
+
+			pixelfunc drawpixels;
 			
 			uint8_t readlcd(uint32_t addr);
 			void writelcd(uint32_t addr, uint8_t val);
 			
 			int scanlinecounter = 0;
 			int pixelx = 0;
+
+			void setpixelcallback(pixelfunc cb)
+			{
+			    drawpixels = cb;
+			}
 			
 
 			enum Phase : int

@@ -76,7 +76,7 @@ namespace gba
 		case 0x49: temp = winctrl[1].read(); break;
 		case 0x4A: temp = winctrl[2].read(); break;
 		case 0x4B: temp = winctrl[3].read(); break;
-		default: cout << "Unrecognized GPU read of " << hex << (int)((addr & 0xFF)) << endl; temp = 0xFF; break;
+		default: temp = 0xFF; break;
 	    }
 
 	    return temp;
@@ -170,7 +170,7 @@ namespace gba
 		case 0x53: blendevb = (value & 0x1F); break;
 		case 0x54: blendevy = (value & 0x1F); break;
 		case 0x55: return; break;
-		default: cout << "Unrecognized GPU write of " << hex << (int)((addr & 0xFF)) << endl; break;
+		default: break;
 	    }
 	}
 	
@@ -207,6 +207,7 @@ namespace gba
 
 			if (vcount == 160)
 			{
+			    drawpixels();
 			    gpumem.signalvblank();
 			    vblank(true);
 			    affvblank();

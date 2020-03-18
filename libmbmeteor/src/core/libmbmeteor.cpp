@@ -25,8 +25,9 @@ namespace gba
 	coremmu = make_unique<MMU>();
 	coregpu = make_unique<GPU>(*coremmu);
 	coreinput = make_unique<Input>(*coremmu);
-	coretimers = make_unique<Timers>(*coremmu);
-	corecpu = make_unique<CPU>(*coremmu, *coregpu, *coreinput, *coretimers);
+	coreapu = make_unique<APU>(*coremmu);
+	coretimers = make_unique<Timers>(*coremmu, *coreapu);
+	corecpu = make_unique<CPU>(*coremmu, *coregpu, *coreinput, *coretimers, *coreapu);
     }
 
     GBACore::~GBACore()
@@ -58,6 +59,7 @@ namespace gba
 	coregpu->shutdown();
 	corecpu->shutdown();
 	coremmu->shutdown();
+	// coreapu->writeraw("test.raw");
     }
 
     void GBACore::printusage(char* argv)
@@ -113,6 +115,16 @@ namespace gba
     void GBACore::keyreleased(Button button)
     {
 	coreinput->keyreleased(button);
+    }
+
+    void GBACore::setaudiocallback(apuoutput cb)
+    {
+	coreapu->setaudiocallback(cb);
+    }
+
+    void GBACore::setpixelcallback(pixelfunc cb)
+    {
+	coregpu->setpixelcallback(cb);
     }
 
     void GBACore::runcore()

@@ -196,16 +196,22 @@ namespace gba
 	    int dma0oldlength = 0;
 
 	    uint32_t dma1src = 0;
+	    uint32_t dma1fifosrc = 0;
 	    uint32_t dma1dst = 0;
 	    uint16_t dma1length = 0;
 	    uint16_t dma1control = 0;
 	    int dma1unitstocopy = 0;
+	    bool dma1fifo = false;
+	    bool dma1req = false;
 
 	    uint32_t dma2src = 0;
+	    uint32_t dma2fifosrc = 0;
 	    uint32_t dma2dst = 0;
 	    uint16_t dma2length = 0;
 	    uint16_t dma2control = 0;
 	    int dma2unitstocopy = 0;
+	    bool dma2fifo = false;
+	    bool dma2req = false;
 
 	    uint32_t dma3src = 0;
 	    uint32_t dma3dst = 0;
@@ -496,7 +502,17 @@ namespace gba
 	    {
 		for (int i = 0; i < 4; i++)
 		{
-		    if (getdmastate(i) == DmaState::Paused)
+		    if ((i == 1) && (dma1fifo == true))
+		    {
+			continue;
+		    }
+
+		    if ((i == 2) && (dma2fifo == true))
+		    {
+			continue;
+		    }
+
+		    if ((getdmastate(i) == DmaState::Paused))
 		    {
 			resetdmalength(i);
 			setdmastate(i, DmaState::Starting);
@@ -508,10 +524,41 @@ namespace gba
 	    {
 		for (int i = 0; i < 4; i++)
 		{
-		    if (getdmastate(i) == DmaState::Paused)
+		    if ((i == 1) && (dma1fifo == true))
+		    {
+			continue;
+		    }
+
+		    if ((i == 2) && (dma2fifo == true))
+		    {
+			continue;
+		    }
+
+		    if ((getdmastate(i) == DmaState::Paused))
 		    {
 			resetdmalength(i);
 			setdmastate(i, DmaState::Starting);
+		    }
+		}
+	    }
+
+	    void signalfifo(int num)
+	    {
+		if ((num == 1) && (dma1fifo == true) && (dma1req == true))
+		{
+		    if (getdmastate(num) == DmaState::Paused)
+		    {
+			dma1unitstocopy = 4;
+			setdmastate(num, DmaState::Starting);
+		    }
+		}
+
+		if ((num == 2) && (dma2fifo == true) && (dma2req == true))
+		{
+		    if (getdmastate(num) == DmaState::Paused)
+		    {
+			dma2unitstocopy = 4;
+			setdmastate(num, DmaState::Starting);
 		    }
 		}
 	    }
@@ -540,6 +587,31 @@ namespace gba
 		    case 0: setdmastate(num, DmaState::Starting); break;
 		    case 1: setdmastate(num, (isvblank() ? DmaState::Starting : DmaState::Paused)); break;
 		    case 2: setdmastate(num, (ishblank() ? DmaState::Starting : DmaState::Paused)); break;
+		    case 3:
+		    {
+			switch (num)
+			{
+			    case 0: cout << "Prohibited" << endl; exit(1); break;
+			    case 1:
+			    {
+				setdmastate(1, DmaState::Paused);
+				dma1unitstocopy = 4;
+				dma1src = dma1fifosrc;
+				dma1fifo = true;
+			    }
+			    break;
+			    case 2:
+			    {
+				setdmastate(2, DmaState::Paused);
+				dma2unitstocopy = 4;
+				dma2src = dma2fifosrc;
+				dma2fifo = true;
+			    }
+			    break;
+			    case 3: cout << "DMA3 Video Capture" << endl; break;
+			}
+		    }
+		    break;
 		}
 	    }
 
@@ -567,6 +639,20 @@ namespace gba
 
 		    if (getdmaunits(num) == 0)
 		    {
+			if ((num == 2) && (dma2fifo == true) && (dma2req == true))
+			{
+			    setdmastate(num, DmaState::Paused);
+			    dma2req = false;
+			    return;
+			}
+
+			if ((num == 1) && (dma1fifo == true) && (dma1req == true))
+			{
+			    setdmastate(num, DmaState::Paused);
+			    dma1req = false;
+			    return;
+			}
+
 			int dstcontrol = ((getdmacontrol(num) >> 5) & 0x3);
 			int dmaunits = getdmalength(num);
 
@@ -581,7 +667,7 @@ namespace gba
 			}
 			else
 			{
-			   setdmastate(num, DmaState::Paused);
+			    setdmastate(num, DmaState::Paused);
 			}
 		    }
 		}
@@ -611,6 +697,22 @@ namespace gba
 
 	    void executedma(int num)
 	    {
+		if ((num == 2) && (dma2fifo == true) && (dma2req == true))
+		{
+		    writeLong(getdmadst(num), readLong(getdmasrc(num)));
+		    dma2src += 4;
+		    decdmaunits(num);
+		    return;
+		}
+
+		if ((num == 1) && (dma1fifo == true) && (dma1req == true))
+		{
+		    writeLong(getdmadst(num), readLong(getdmasrc(num)));
+		    dma1src += 4;
+		    decdmaunits(num);
+		    return;
+		}
+
 		if (TestBit(getdmacontrol(num), 10))
 		{
 		    int srccontrol = ((getdmacontrol(num) >> 7) & 0x3);
@@ -656,11 +758,7 @@ namespace gba
 	    {
 		for (int i = 0; i < 4; i++)
 		{
-		    if (dmainprogress(i))
-		    {
-			updatedma(i);
-			return;
-		    }
+		    updatedma(i);
 		}
 	    }
 

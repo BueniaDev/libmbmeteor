@@ -20,6 +20,7 @@
 #include "mmu.h"
 #include "cpu.h"
 #include "gpu.h"
+#include "apu.h"
 #include "input.h"
 #include "timers.h"
 #include "libmbmeteor_api.h"
@@ -43,6 +44,7 @@ namespace gba
 	    unique_ptr<GPU> coregpu;
 	    unique_ptr<Input> coreinput;
 	    unique_ptr<Timers> coretimers;
+	    unique_ptr<APU> coreapu;
 	    unique_ptr<CPU> corecpu;
 
 	    bool init();
@@ -58,6 +60,14 @@ namespace gba
 	    void runcore();
 
 	    int overspentcycles = 0;
+
+	    void setaudiocallback(apuoutput cb);
+	    void setpixelcallback(pixelfunc cb);
+
+	    RGB* framebuffer()
+	    {
+		return coregpu->framebuffer;
+	    }
 
 	    string romname;
 	    string biosname;
