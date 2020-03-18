@@ -758,7 +758,11 @@ namespace gba
 	    {
 		for (int i = 0; i < 4; i++)
 		{
-		    updatedma(i);
+		    if (dmainprogress(i))
+		    {
+		        updatedma(i);
+			return;
+		    }
 		}
 	    }
 
