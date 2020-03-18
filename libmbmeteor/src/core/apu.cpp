@@ -41,8 +41,12 @@ namespace gba
 
 	switch ((addr & 0xFF))
 	{
-	    case 0x80: temp = 0; break;
-	    case 0x81: temp = 0; break;
+	    case 0x60: temp = s1sweep; break;
+	    case 0x62: temp = s1length; break;
+	    case 0x63: temp = s1envelope; break;
+	    case 0x65: temp = (s1freqhi & 0x40); break;
+	    case 0x80: temp = mastervolume; break;
+	    case 0x81: temp = soundselect; break;
 	    case 0x88: temp = (soundbias & 0xFF); break;
 	    case 0x89: temp = (soundbias >> 8); break;
 	    default: temp = 0x00; break;
@@ -55,8 +59,28 @@ namespace gba
     {
 	switch ((addr & 0xFF))
 	{
-	    case 0x80: return; break;
-	    case 0x81: return; break;
+	    case 0x60: writes1sweep(val); break;
+	    case 0x62:
+	    {
+		s1length = val;
+		reloads1lengthcounter();
+		sets1dutycycle();
+	    }
+	    break;
+	    case 0x63:
+	    {
+		s1envelope = val;
+
+		if (((s1envelope & 0xF0) >> 4) == 0)
+		{
+		    s1enabled = false;
+		}
+	    }
+	    break;
+	    case 0x64: s1freqlo = val; break;
+	    case 0x65: s1writereset(val); break;
+	    case 0x80: mastervolume = val; break;
+	    case 0x81: soundselect = val; break;
 	    case 0x82: writeratio(val); break;
 	    case 0x83: writedsound(val); break;
 	    case 0x84: writemaster(val); break;
@@ -85,13 +109,128 @@ namespace gba
 
     }
 
+    void APU::s1sweeptick(int frameseq)
+    {
+	bool sweepinc = TestBit(frameseq, 1);
+
+	if (s1sweepenabled)
+	{
+	    if (!sweepinc && prevs1sweepinc)
+	    {
+		s1sweepcounter -= 1;
+
+		if (s1sweepcounter == 0)
+	    	{
+		    s1shadowfreq = s1sweepcalc();
+		    s1freqlo = (s1shadowfreq & 0xFF);
+		    s1freqhi &= 0xF8;
+		    s1freqhi |= ((s1shadowfreq & 0x0700) >> 8);
+
+		    s1sweepcalc();
+		    s1sweepcounter = (((s1sweep & 0x70) >> 4) + 1);
+	    	}
+	    }
+    	}
+
+	prevs1sweepinc = sweepinc;
+    }
+	
+    void APU::s1lengthcountertick(int frameseq)
+    {
+	bool lengthcounterdec = TestBit(frameseq, 0);
+
+	if (TestBit(s1freqhi, 6) && s1lengthcounter > 0)
+	{
+	    if (!lengthcounterdec && prevs1lengthdec)
+	    {
+		s1lengthcounter -= 1;
+
+		if (s1lengthcounter == 0)
+		{
+		    s1enabled = false;
+		}
+	    }
+	}
+
+	prevs1lengthdec = lengthcounterdec;
+    }
+	
+    void APU::s1envelopetick(int frameseq)
+    {
+	bool envelopeinc = TestBit(frameseq, 2);
+
+	if (s1envelopeenabled)
+	{
+	    if (!envelopeinc && prevs1envelopeinc)
+	    {
+		s1envelopecounter -= 1;
+
+		if (s1envelopecounter == 0)
+		{
+		    if (!TestBit(s1envelope, 3))
+		    {
+			s1volume -= 1;
+
+			if (s1volume == 0)
+			{
+			    s1envelopeenabled = false;
+			}
+		    }
+		    else
+		    {
+			s1volume += 1;
+			if (s1volume == 0x0F)
+			{
+			    s1envelopeenabled = false;
+			}
+		    }
+
+		    s1envelopecounter = (s1envelope & 0x7);
+		}
+	    }
+	}
+
+	prevs1envelopeinc = envelopeinc;
+    }
+	
+    inline void APU::s1timertick()
+    {
+	if (s1periodtimer == 0)
+	{
+	    s1seqpointer = ((s1seqpointer + 1) & 7);
+	    s1reloadperiod();
+	}
+	else
+	{
+	    s1periodtimer -= 1;
+	}
+    }
+	
+    void APU::s1update(int frameseq)
+    {
+	s1sweeptick(frameseq);
+	s1timertick();
+	s1lengthcountertick(frameseq);
+	s1envelopetick(frameseq);
+    }
+	
+    float APU::gets1outputvol()
+    {
+	int outputvol = 0;
+	outputvol = (s1dutycycle[s1seqpointer] * s1volume);
+
+	return ((float)(outputvol) / 100.f);
+    }
+
     void APU::updateapu()
     {
 	apuclock += 1;
 
-	if (apuclock == getsampleinterval())
+	if (apuclock == 8)
 	{
+	    frametimer += 1;
 	    apuclock = 0;
+	    s1update(getframesequencer());
 	}
 
 	nearestresample();
@@ -99,7 +238,39 @@ namespace gba
 
     void APU::mixaudio()
     {
-	int16_t sample[2] = {0, 0};
+	static constexpr float ampl = 8000;
+
+	auto sound1 = gets1outputvol();
+
+        float leftsample = 0;
+        float rightsample = 0;
+
+	if (s1enabledleft())
+        {
+	    leftsample += sound1;
+        }
+
+	if (s1enabledright())
+        {
+	    rightsample += sound1;
+        }
+
+	int mastervolleft = ((mastervolume >> 4) & 0x7);
+	int mastervolright = (mastervolume & 0x7);
+
+	auto leftvolume = (((float)(mastervolleft)) / 7.0f);
+	auto rightvolume = (((float)(mastervolright)) / 7.0f);
+
+	auto left = (int16_t)(leftsample * leftvolume * ampl);
+	auto right = (int16_t)(rightsample * rightvolume * ampl);
+
+	left *= psgvolume;
+	right *= psgvolume;
+
+	left /= 28;
+	right /= 28;	
+
+	int16_t sample[2] = {left, right};
 	int16_t finalsample[2] = {0, 0};
 
 	if (dmasoundaleft && dmafifoarunning)

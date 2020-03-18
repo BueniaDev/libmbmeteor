@@ -812,11 +812,12 @@ namespace gba
 	if (file.is_open())
 	{
 	    streampos size = file.tellg();
+	    vector<uint8_t> rom(size, 0);
 	    gamerom.resize(0x10000000, 0);
 	    file.seekg(0, ios::beg);
-	    file.read((char*)&gamerom[0], size);
+	    file.read((char*)rom.data(), rom.size());
 
-	    carttype = getcarttype(gamerom);
+	    carttype = getcarttype(rom);
 
 	    switch (carttype)
 	    {
@@ -841,6 +842,11 @@ namespace gba
 		}
 		break;
 		case CartridgeType::None: break;
+	    }
+
+	    for (int i = 0; i < rom.size(); i++)
+	    {
+		gamerom[i] = rom[i];
 	    }
 
 	    cout << "File succesfully loaded." << endl;

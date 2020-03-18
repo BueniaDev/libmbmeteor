@@ -74,6 +74,173 @@ namespace gba
 	    void updatefifoa();
 	    void updatefifob();
 
+	    int psgvolume = 0;
+
+	    int frametimer = 0;
+	    uint8_t s1sweep = 0;
+	    uint8_t s1length = 0;
+	    int s1lengthcounter = 0;
+	    uint8_t s1envelope = 0;
+	    uint8_t s1freqlo = 0;
+	    uint8_t s1freqhi = 0;
+	    array<int, 8> s1dutycycle;
+	    
+	    bool s1enabled = false;
+	    bool s1sweepenabled = false;
+	    bool s1envelopeenabled = false;
+	    bool s1negative = false;
+	    uint16_t s1shadowfreq = 0;
+	    int s1sweepcounter = 0;
+	    int s1envelopecounter = 0;
+	    int s1volume = 0;
+	    int s1periodtimer = 0;
+	    int s1seqpointer = 0;
+	    bool prevs1sweepinc = false;
+	    bool prevs1lengthdec = false;
+	    bool prevs1envelopeinc = false;
+
+	    inline void s1update(int frameseq);
+	    void s1sweeptick(int frameseq);
+	    void s1lengthcountertick(int frameseq);
+	    void s1envelopetick(int frameseq);
+	    void s1timertick();
+	    float gets1outputvol();
+
+	    int mastervolume = 0;
+	    uint8_t soundselect = 0;
+
+	    inline int getframesequencer()
+	    {
+		return (frametimer >> 13);
+	    }
+
+	    inline bool apulengthlow()
+	    {
+		return !TestBit(getframesequencer(), 0);
+	    }
+
+	    inline void writes1sweep(uint8_t value)
+	    {
+		s1sweep = (value & 0x7F);
+
+		if ((((s1sweep & 0x70) >> 4) == 0) || ((s1sweep & 0x07) == 0) || (!TestBit(s1sweep, 3) && s1negative))
+		{
+		    s1sweepenabled = false;
+		}
+	    }
+
+	    inline void reloads1lengthcounter()
+	    {
+		s1lengthcounter = (64 - (s1length & 0x3F));
+		s1length &= 0xC0;	
+	    }
+
+	    inline void sets1dutycycle()
+	    {
+		switch ((s1length & 0xC0) >> 6)
+		{
+		    case 0: s1dutycycle = {{false, false, false, false, false, false, false, true}}; break;
+		    case 1: s1dutycycle = {{true, false, false, false, false, false, false, true}}; break;
+		    case 2: s1dutycycle = {{true, false, false, false, false, true, true, true}}; break;
+		    case 3: s1dutycycle = {{false, true, true, true, true, true, true, false}}; break;
+		    default: break;
+		}
+	    }
+
+	    inline bool s1enabledleft()
+	    {
+		return (s1enabled && (TestBit(soundselect, 4)));
+	    }
+
+	    inline bool s1enabledright()
+	    {
+		return (s1enabled && (TestBit(soundselect, 0)));
+	    }
+
+	    inline void s1writereset(uint8_t value)
+	    {
+		bool lengthwasenable = TestBit(s1freqhi, 6);
+		s1freqhi = (value & 0xC7);
+
+		if (apulengthlow() && !lengthwasenable && TestBit(s1freqhi, 6) && s1lengthcounter > 0)
+		{
+		    s1lengthcounter -= 1;
+
+		    if (s1lengthcounter == 0)
+		    {
+			s1enabled = false;
+		    }
+		}
+
+		if (TestBit(s1freqhi, 7))
+		{
+		    s1resetchannel();
+		}
+	    }
+
+	    inline uint16_t s1sweepcalc()
+	    {
+		uint16_t freqdelta = (s1shadowfreq >> (s1sweep & 0x07));
+
+		if (TestBit(s1sweep, 3))
+		{
+		    freqdelta *= -1;
+		    freqdelta &= 0x7FF;
+
+		    s1negative = true;
+		}
+
+		uint16_t newfreq = ((s1shadowfreq + freqdelta) & 0x7FF);
+
+		if (newfreq > 2047)
+		{
+		    s1sweepenabled = false;
+		    s1enabled = false;
+		}
+
+		return newfreq;
+	    }
+
+	    inline void s1resetchannel()
+	    {
+		s1enabled = true;
+		s1reloadperiod();
+		s1freqhi &= 0x7F;
+
+		s1shadowfreq = (s1freqlo | ((s1freqhi & 0x7) << 8));
+		s1sweepcounter = ((s1sweep & 0x70) >> 4);
+		s1sweepenabled = (s1sweepcounter != 0 && ((s1sweep & 0x07) != 0));
+		s1sweepcalc();
+
+		s1negative = false;
+
+		s1volume = ((s1envelope & 0xF0) >> 4);
+		s1envelopecounter = (s1envelope & 0x07);
+		s1envelopeenabled = (s1envelopecounter != 0);
+
+
+		if ((!TestBit(s1envelope, 3) && s1volume == 0) || (TestBit(s1envelope, 3) && s1volume == 0x0F))
+		{
+		    s1envelopeenabled = false;
+		}
+
+		if (s1lengthcounter == 0)
+		{
+		    s1lengthcounter = 64;
+
+		    if (apulengthlow() && TestBit(s1freqhi, 6))
+		    {
+			s1lengthcounter -= 1;
+		    }
+		}
+	    }
+		
+	    inline void s1reloadperiod()
+	    {
+		int frequency = (s1freqlo | ((s1freqhi & 0x07) << 8));
+		s1periodtimer = ((2048 - frequency) << 1);
+	    }
+
 	    bool dma1fiforec = false;
 
 	    void consumesamplefifoa(int timer)
@@ -225,6 +392,14 @@ namespace gba
 
 	    void writeratio(uint8_t val)
 	    {
+		switch ((val & 0x3))
+		{
+		    case 0: psgvolume = 1; break;
+		    case 1: psgvolume = 2; break;
+		    case 2: psgvolume = 4; break;
+		    case 3: psgvolume = 0; break; 
+		}
+
 		dmasoundaratio = TestBit(val, 2);
 		dmasoundbratio = TestBit(val, 3);
 	    }
