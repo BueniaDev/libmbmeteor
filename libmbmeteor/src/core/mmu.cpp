@@ -84,9 +84,8 @@ namespace gba
     uint8_t MMU::readByte(uint32_t addr)
     {
 	uint8_t temp = 0;
-	addr = (addr % 0x10000000);
 
-	uint8_t addrtemp = ((addr >> 24) & 0xF);
+	uint8_t addrtemp = (addr >> 24);
 
 	switch (addrtemp)
 	{
@@ -202,7 +201,7 @@ namespace gba
 		}
 	    }
 	    break;
-	    default: cout << "Unrecognized read from region of " << hex << (int)(addrtemp) << endl; dump = true; temp = 0xFF; break;
+	    default: temp = 0xFF; break;
 	}
 
 	return temp;
@@ -210,8 +209,6 @@ namespace gba
 
     void MMU::writeByte(uint32_t addr, uint8_t val)
     {
-	addr = (addr % 0x10000000);
-
 	uint8_t addrtemp = (addr >> 24);
 
 	switch (addrtemp)
@@ -309,7 +306,7 @@ namespace gba
 		return;
 	    }
 	    break;
-	    default: cout << "Unrecognized write to region of " << hex << (int)(addrtemp) << endl; memarm.printregs(); exit(1); break;
+	    default: return; break;
 	}
     }
 

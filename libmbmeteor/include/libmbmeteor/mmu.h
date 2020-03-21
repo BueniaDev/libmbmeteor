@@ -77,7 +77,7 @@ namespace gba
 		uint8_t readtemp(uint32_t addr)
 		{
 		    // cout << "Unrecognized read from " << hex << (int)(addr) << endl;
-		    return 0xFF;
+		    return 0x00;
 		}
 		
 		void writetemp(uint32_t addr, uint8_t val)

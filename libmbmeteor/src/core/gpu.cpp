@@ -42,6 +42,8 @@ namespace gba
 		framebuffer[i] = black;
 	    }
 
+	    phase = Phase::Scanline;
+
 	    cout << "GPU::Initialized" << endl;
 	}
 
@@ -188,9 +190,9 @@ namespace gba
 		{
 		    if (scanlinecounter == 1006)
 		    {
-			gpumem.signalhblank();
-			hblank(true);
 			phase = Phase::HBlank;
+			hblank(true);
+			gpumem.signalhblank();
 		    }
 		}
 		break;
@@ -201,23 +203,21 @@ namespace gba
 			scanlinecounter = 0;
 			hblank(false);
 
-			bool vcountflag = ++vcount == (dispstat >> 8);
-
+			bool vcountflag = (++vcount == (dispstat >> 8));
 			vcountset(vcountflag);
 
 			if (vcount == 160)
 			{
-			    drawpixels();
-			    gpumem.signalvblank();
-			    vblank(true);
-			    affvblank();
 			    phase = Phase::VBlankScanline;
+			    affvblank();
+			    vblank(true);
+			    drawpixels();
 			}
 			else
 			{
-			    affhblank();
-			    renderscanline();
 			    phase = Phase::Scanline;
+			    renderscanline();
+			    affhblank();
 			}
 		    }
 		}
@@ -226,8 +226,8 @@ namespace gba
 		{
 		    if (scanlinecounter == 1006)
 		    {
-			hblank(true);
 			phase = Phase::VBlankHBlank;
+			hblank(true);
 		    }
 		}
 		break;
@@ -236,16 +236,15 @@ namespace gba
 		    if (scanlinecounter == 1232)
 		    {
 			scanlinecounter = 0;
-			hblank(false);
 
-			bool vcountflag = false;
+			hblank(false);
 
 			if (vcount == 227)
 			{
 			    vcount = 0;
-			    vcountflag = ((dispstat >> 8) == 0);
-			    renderscanline();
+			    vcountset((dispstat >> 8) == 0);
 			    phase = Phase::Scanline;
+			    renderscanline();
 			}
 			else
 			{
@@ -256,12 +255,11 @@ namespace gba
 				vblank(false);
 			    }
 
-			    vcountflag = ++vcount == (dispstat >> 8);
+			    vcountset((++vcount == (dispstat >> 8)));
 			}
-
-			vcountset(vcountflag);
 		    }
 		}
+		break;
 	    }
 	}
 

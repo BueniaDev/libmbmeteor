@@ -44,10 +44,7 @@ namespace gba
 
     void CPU::init()
     {
-	arm->init(0x8000000, 0x5F);
-	arm->armreg.r13 = 0x3007F00;
-	arm->armreg.r13svc = 0x3007FE0;
-	arm->armreg.r13irq = 0x3007FA0;
+	arm->init(0x0, 0xD3);
 	cout << "CPU::Initialized" << endl;
     }
 

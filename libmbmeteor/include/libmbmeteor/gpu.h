@@ -233,6 +233,12 @@ namespace gba
 			
 			void setcy(int layernum)
 			{
+			    if ((bgaff[layernum].cy == 1024) && (bgaff[layernum].y == 0))
+			    {
+				cout << hex << (int)(dispstat) << endl;
+				exit(1);
+			    }
+
 			    bgaff[layernum].cy = (bgaff[layernum].y & 0xFFFFFFF);
 
 			    if (TestBit(bgaff[layernum].y, 27))
@@ -248,6 +254,8 @@ namespace gba
 			    bgaff[1].cx += bgaff[1].pb;
 			    bgaff[1].cy += bgaff[1].pd;
 			}
+
+			bool dump = false;
 
 			void affvblank()
 			{
