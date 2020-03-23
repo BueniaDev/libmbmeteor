@@ -145,22 +145,50 @@ namespace gba
 		break;
 	    case 0x8:
 	    {
+		waitstate = 0;
 		temp = gamerom[(addr - 0x8000000)];
+
+		if ((addr >= 0x80000C4) && (addr < 0x80000CA))
+		{
+		    if (isgpioreadable)
+		    {
+			switch ((addr & 0xFF))
+			{
+			    case 0xC4: temp = gpiodata; break;
+			    case 0xC6: temp = gpiodirection; break;
+			    case 0xC8: temp = isgpioreadable; break;
+			    default: temp = 0x00; break;
+			}
+		    }
+		    else
+		    {
+			temp = 0x00;
+		    }
+		}
 	    }
 	    break;
 	    case 0x9:
 	    {
+		waitstate = 0;
 		temp = gamerom[(addr - 0x8000000)];
 	    }
 	    break;
 	    case 0xA:
 	    {
+		waitstate = 1;
 		temp = gamerom[(addr - 0xA000000)];
 	    }
 	    break;
 	    case 0xB:
 	    {
+		waitstate = 1;
 		temp = gamerom[(addr - 0xA000000)];
+	    }
+	    break;
+	    case 0xC:
+	    {
+		waitstate = 2;
+		temp = gamerom[(addr - 0xC000000)];
 	    }
 	    break;
 	    case 0xD:
@@ -258,7 +286,38 @@ namespace gba
 		break;
 	    case 0x8:
 	    {
-		return;
+		if (!rtcenable)
+		{
+		    return;
+		}
+
+		if ((addr >= 0x80000C4) && (addr < 0x80000CA))
+		{
+		    switch ((addr & 0xFF))
+		    {
+			case 0xC4:
+			{
+			    gpiodata = (val & 0xF);
+			    processrtc();
+			}
+			break;
+			case 0xC6:
+			{
+			    gpiodirection = (val & 0xF);
+			}
+			break;
+			case 0xC8:
+			{
+			    isgpioreadable = TestBit(val, 0);
+			}
+			break;
+			default: return; break;
+		    }
+		}
+		else
+		{
+		    return;
+		}
 	    }
 	    break;
 	    case 0x9:
@@ -330,6 +389,201 @@ namespace gba
     {
 	writeWord(addr, (val & 0xFFFF));
 	writeWord((addr + 2), (val >> 16));
+    }
+
+    void MMU::processrtc()
+    {
+	switch (rtcstate)
+	{
+	    case 0:
+	    {
+		if ((gpiodata & 0x5) == 0x1)
+		{
+		    rtcstate += 1;
+		}
+	    }
+	    break;
+	    case 1:
+	    {
+		if ((gpiodata & 0x5) == 0x5)
+		{
+		    rtccounter = 0;
+		    rtcbyte = 0;
+		    rtcstate += 1;
+		}
+	    }
+	    break;
+	    case 2:
+	    {
+		if (TestBit(gpiodata, 0))
+		{
+		    rtcbyte = BitChange(rtcbyte, (7 - rtccounter), TestBit(gpiodata, 1));
+		    rtccounter += 1;
+
+		    if (rtccounter == 8)
+		    {
+			if ((rtcbyte & 0xF0) == 0x60)
+			{
+			    int param = ((rtcbyte >> 1) & 0x7);
+			    bool readdata = TestBit(rtcbyte, 0);
+
+			    switch (param)
+			    {
+				case 0:
+				{
+				    rtcstate = 0;
+				}
+				break;
+				case 1:
+				{
+				    if (readdata)
+				    {
+					rtcdata[0] = rtccontrol;
+					rtcserlen = 1;
+					rtcsercount = 0;
+					rtcindex = 0;
+					rtcstate = 3;
+				    }
+				    else
+				    {
+					rtcserlen = 1;
+					rtcsercount = 0;
+					rtcindex = 0;
+					rtcstate = 4;
+				    }
+				}
+				break;
+				case 2:
+				{
+				    if (readdata)
+				    {
+					rtcserlen = 7;
+					rtcsercount = 0;
+					rtcindex = 0;
+					rtcstate = 3;
+					uint8_t rawhours = 0;
+
+					time_t systime = time(0);
+					tm* currtime = localtime(&systime);
+
+					rtcdata[0] = (currtime->tm_year % 100);
+					rtcdata[0] = getbcd(rtcdata[0]);
+
+					rtcdata[1] = (currtime->tm_mon + 1);
+					rtcdata[1] = getbcd(rtcdata[1]);
+
+					rtcdata[2] = currtime->tm_mday;
+					rtcdata[2] = getbcd(rtcdata[2]);
+
+					rtcdata[3] = currtime->tm_wday;
+					rtcdata[3] = getbcd(rtcdata[3]);
+
+					rtcdata[4] = currtime->tm_hour;
+					rtcdata[4] = TestBit(rtccontrol, 6) ? (rtcdata[4] % 24) : (rtcdata[4] % 12);
+					rawhours = rtcdata[4];
+					rtcdata[4] = getbcd(rtcdata[4]);
+
+					rtcdata[5] = currtime->tm_min;
+					rtcdata[5] = (rtcdata[5] % 60);
+					rtcdata[5] = getbcd(rtcdata[5]);
+					
+					rtcdata[6] = currtime->tm_sec;
+
+					if (rtcdata[6] > 59)
+					{
+					    rtcdata[6] = 59;
+					}
+
+					rtcdata[6] = (rtcdata[6] % 60);
+					rtcdata[6] = getbcd(rtcdata[6]);
+				    }
+				}
+				break;
+				case 3:
+				{
+				    if (readdata)
+				    {
+					rtcserlen = 3;
+					rtcsercount = 0;
+					rtcindex = 0;
+					rtcstate = 3;
+					uint8_t rawhours = 0;
+
+					time_t systime = time(0);
+					tm* currtime = localtime(&systime);
+
+					rtcdata[0] = currtime->tm_hour;
+					rtcdata[0] = TestBit(rtccontrol, 6) ? (rtcdata[0] % 24) : (rtcdata[0] % 12);
+					rawhours = rtcdata[0];
+					rtcdata[0] = getbcd(rtcdata[0]);
+
+					rtcdata[1] = currtime->tm_min;
+					rtcdata[1] = (rtcdata[1] % 60);
+					rtcdata[1] = getbcd(rtcdata[1]);
+
+					rtcdata[2] = currtime->tm_sec;
+
+					if (rtcdata[2] > 59)
+					{
+					    rtcdata[2] = 59;
+					}
+
+					rtcdata[2] = (rtcdata[2] % 60);
+					rtcdata[2] = getbcd(rtcdata[2]);
+				    }
+				}
+				break;
+				default: cout << "Unrecognized RTC commmand of " << dec << (int)(param) << endl; exit(1); break;
+			    }
+			}
+		    }
+		}
+	    }
+	    break;
+	    case 0x3:
+	    {
+		if (TestBit(gpiodata, 0))
+		{
+		    gpiodata = BitChange(gpiodata, 1, TestBit(rtcdata[rtcindex], 0));
+
+		    rtcdata[rtcindex] >>= 1;
+		    rtcsercount += 1;
+
+		    if (rtcsercount == 8)
+		    {
+			rtcsercount = 0;
+			rtcindex += 1;
+
+			if (rtcindex == rtcserlen)
+			{
+			    rtcstate = 0;
+			}
+		    }
+		}
+	    }
+	    break;
+	    case 0x4:
+	    {
+		if (!TestBit(gpiodata, 0))
+		{
+		    rtcdata[rtcindex] = BitChange(rtcdata[rtcindex], rtcsercount, TestBit(gpiodata, 1));
+
+		    rtcsercount += 1;
+
+		    if (rtcsercount == 8)
+		    {
+			rtcsercount = 0;
+			rtcindex += 1;
+
+			if (rtcindex == rtcserlen)
+			{
+			    rtcstate = 0;
+			}
+		    }
+		}
+	    }
+	    break;
+	}
     }
 
     uint8_t MMU::readflash128k(uint32_t addr)
@@ -802,6 +1056,103 @@ namespace gba
 	}
     }
 
+    bool MMU::savebackup(string filename)
+    {
+	bool success = false;
+	ofstream file(filename.c_str(), ios::out | ios::binary);
+
+	if (file.is_open())
+	{
+	    switch (carttype)
+	    {
+		case CartridgeType::CartSRAM:
+		{
+		    file.write((char*)gamesram.data(), gamesram.size());
+		}
+		break;
+		case CartridgeType::CartEEPROM:
+		{
+		    file.write((char*)gameeeprom.data(), gameeeprom.size());
+		}
+		break;
+		case CartridgeType::CartFlash128K:
+		{
+		    file.write((char*)gameflash.data(), gameflash.size());
+		}
+		break;
+		case CartridgeType::CartFlash64K:
+		{
+		    file.write((char*)gameflash.data(), gameflash.size());
+		}
+		break;
+		case CartridgeType::None: break;
+	    }
+
+	    cout << "MMU::Backup save succesfully written." << endl;
+	    file.close();
+	    success = true; 
+	}
+	else
+	{
+	    cout << "MMU::Error - Backup save could not be written." << endl;
+	    success = false;
+	}
+
+	return success;
+    }
+
+    bool MMU::loadbackup(string filename)
+    {
+	bool success = false;
+	ifstream file(filename.c_str(), ios::in | ios::binary | ios::ate);
+
+	if (file.is_open())
+	{
+	    streampos size = file.tellg();
+	    file.seekg(0, ios::beg);
+
+	    switch (carttype)
+	    {
+		case CartridgeType::CartSRAM:
+		{
+		    gamesram.resize(size, 0);
+		    file.read((char*)gamesram.data(), size);
+		}
+		break;
+		case CartridgeType::CartEEPROM:
+		{
+		    gameeeprom.resize(size, 0);
+		    file.read((char*)gameeeprom.data(), size);
+		}
+		break;
+		case CartridgeType::CartFlash128K:
+		{
+		    gameflash.resize(size, 0xFF);
+		    file.read((char*)gameflash.data(), size);
+		}
+		break;
+		case CartridgeType::CartFlash64K:
+		{
+		    gameflash.resize(size, 0xFF);
+		    file.read((char*)gameflash.data(), size);
+		}
+		break;
+		case CartridgeType::None: break;
+	    }
+
+	    cout << "MMU::Backup save succesfully loaded." << endl;
+	    file.close();
+	    success = true; 
+	}
+	else
+	{
+	    cout << "MMU::Error - Backup save could not be loaded." << endl;
+	    success = false;
+	}
+
+	return success;
+    }
+
     bool MMU::loadROM(string filename)
     {
 	ifstream file(filename.c_str(), ios::in | ios::binary | ios::ate);
@@ -809,12 +1160,11 @@ namespace gba
 	if (file.is_open())
 	{
 	    streampos size = file.tellg();
-	    vector<uint8_t> rom(size, 0);
-	    gamerom.resize(0x10000000, 0);
+	    gamerom.resize(0x2000000, 0);
 	    file.seekg(0, ios::beg);
-	    file.read((char*)rom.data(), rom.size());
+	    file.read((char*)gamerom.data(), size);
 
-	    carttype = getcarttype(rom);
+	    carttype = getcarttype(gamerom);
 
 	    switch (carttype)
 	    {
@@ -841,10 +1191,7 @@ namespace gba
 		case CartridgeType::None: break;
 	    }
 
-	    for (int i = 0; i < rom.size(); i++)
-	    {
-		gamerom[i] = rom[i];
-	    }
+	    rtcenable = isrtcsupported(gamerom);
 
 	    cout << "File succesfully loaded." << endl;
 	    file.close();

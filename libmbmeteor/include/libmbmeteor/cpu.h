@@ -82,13 +82,11 @@ namespace gba
 
 	    int clockcycle(uint32_t val, int flags)
 	    {
-		val = (val % 0x10000000);
-
 		int temp = 1;
 
 		if (val < 0x2000000)
 		{
-		    temp = 1;
+		    temp = 2;
 		}
 		else if (val < 0x2040000)
 		{
@@ -96,7 +94,7 @@ namespace gba
 		}
 		else if (val < 0x3000000)
 		{
-		    temp = 1;
+		    temp = 2;
 		}
 		else if (val < 0x4000000)
 		{
@@ -104,25 +102,25 @@ namespace gba
 		}
 		else if (val < 0x5000000)
 		{
-		    temp = 1;
+		    temp = 2;
 		}
 		else if (val < 0x6000000)
 		{
-		    temp = 1;
+		    temp = 2;
 		}
 		else if (val < 0x7000000)
 		{
-		    temp = 1;
+		    temp = 2;
 		}
 		else if (val < 0x8000000)
 		{
-		    temp = 1;
+		    temp = 2;
 		}
 		else if (val < 0xA000000)
 		{
 		    if (TestBit(flags, 1))
 		    {
-			int ftemp = 0;
+			int ftemp = 5;
 
 			int nonseq = ((mem.waitcnt >> 2) & 0x3);
 
@@ -138,14 +136,14 @@ namespace gba
 		    }
 		    else
 		    {
-			temp = TestBit(mem.waitcnt, 4) ? 3 : 2;
+			temp = TestBit(mem.waitcnt, 4) ? 2 : 3;
 		    }
 		}
 		else if (val < 0xC000000)
 		{
 		    if (TestBit(flags, 1))
 		    {
-			int ftemp = 0;
+			int ftemp = 1;
 
 			int nonseq = ((mem.waitcnt >> 2) & 0x3);
 
@@ -161,12 +159,12 @@ namespace gba
 		    }
 		    else
 		    {
-			temp = TestBit(mem.waitcnt, 7) ? 5 : 2;
+			temp = TestBit(mem.waitcnt, 7) ? 2 : 5;
 		    }
 		}
 		else if (val < 0xD000000)
 		{
-		    temp = 1;
+		    temp = 2;
 		}
 		else if (val < 0xE000000)
 		{
@@ -176,7 +174,7 @@ namespace gba
 		    }
 		    else
 		    {
-			temp = 1;
+			temp = 2;
 		    }
 		}
 		else if (val < 0xF000000)
@@ -187,7 +185,7 @@ namespace gba
 		    }
 		    else
 		    {
-			temp = 1;
+			temp = 2;
 		    }
 		}
 		else
@@ -202,8 +200,8 @@ namespace gba
 	    {
 		clockcycles += 1;
 		gpu.updatelcd();
-		mem.updatedma();
 		timer.updatetimers();
+		mem.updatedma();
 		apu.updateapu();
 	    }
 

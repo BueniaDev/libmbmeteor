@@ -22,6 +22,7 @@
 #include <vector>
 #include <iostream>
 #include <fstream>
+#include <sstream>
 #include <cstring>
 #include <bitset>
 #include <functional>
@@ -55,6 +56,54 @@ namespace gba
 	    vector<uint8_t> gameeeprom;
 	    vector<uint8_t> gameflash;
 
+	    // GPIO Stuff
+	    bool rtcenable = false;
+	    bool isgpioreadable = false;
+	    int gpiodata = 0;
+	    int gpiodirection = 0;
+	    int rtcstate = 0;
+	    int rtccounter = 0;
+	    uint8_t rtcbyte = 0;
+	    uint8_t rtcdata[7] = {0, 0, 0, 0, 0, 0, 0};
+	    uint8_t rtccontrol = 0x40;
+	    int rtcserlen = 0;
+	    int rtcsercount = 0;
+	    int rtcindex = 0;
+	    void processrtc();
+
+	    string getgamecodef3(vector<uint8_t> &rom)
+	    {
+		stringstream ss;
+
+		for (int i = 0; i < 3; i++)
+		{
+		    ss << rom[(0xAC + i)];
+		}
+
+		return ss.str();
+	    }
+
+	    bool isrtcsupported(vector<uint8_t> &rom)
+	    {
+		bool temp = false;
+		string gamecode = getgamecodef3(rom);
+
+		switch (rom[0xAC])
+		{
+		    case 0x41: temp = ((gamecode == "AXV") || (gamecode == "AXP")); break;
+		    case 0x42: temp = ((gamecode == "BPE") || (gamecode == "BR4") || (gamecode == "BKA")); break;
+		    case 0x55: temp = true; break;
+		    default: temp = false; break;
+		}
+
+		return temp;
+	    }
+
+	    uint32_t getbcd(uint32_t val)
+	    {
+		return (((val / 10) << 4) | (val % 10));
+	    }
+
 	    bool iseepromsave = false;
 		
 		BeeARM memarm; // For "open-bus" behavior
@@ -63,6 +112,8 @@ namespace gba
 		array<memorywritefunc, 0xFFF> memorywritehandlers;
 
 		bool dump = false;
+
+		int waitstate = 0;
 		
 		void addmemoryreadhandler(uint32_t addr, memoryreadfunc cb)
 		{
@@ -769,6 +820,9 @@ namespace gba
 	    bool loadBIOS(string filename);
 	    bool loadROM(string filename);
 
+	    bool loadbackup(string filename);
+	    bool savebackup(string filename);
+
 	    enum CartridgeType : int
 	    {
 		None = -1,
@@ -784,49 +838,52 @@ namespace gba
 	    {
 		CartridgeType type = CartridgeType::None;
 
-		cout << dec << (int)(rom.size()) << endl;
-		for (int i = 0; i < (int)(rom.size() - 7); i++)
+		for (int i = 0; i < (int)(rom.size()); i++)
 		{
-		    if (strncmp((const char*)&rom[i], "SRAM_V", 6) == 0)
+		    switch (rom[i])
 		    {
-			type = CartridgeType::CartSRAM;
-			return type;
-		    }
-		}
-
-		for (int i = 0; i < (int)(rom.size() - 9); i++)
-		{
-		    if (strncmp((const char*)&rom[i], "EEPROM_V", 8) == 0)
-		    {
-			type = CartridgeType::CartEEPROM;
-			return type;
-		    }
-		}
-
-		for (int i = 0; i < (int)(rom.size() - 10); i++)
-		{
-		    if (strncmp((const char*)&rom[i], "FLASH1M_V", 9) == 0)
-		    {
-			type = CartridgeType::CartFlash128K;
-			return type;
-		    }
-		}
-
-		for (int i = 0; i < (int)(rom.size() - 11); i++)
-		{
-		    if (strncmp((const char*)&rom[i], "FLASH512_V", 10) == 0)
-		    {
-			type = CartridgeType::CartFlash64K;
-			return type;
-		    }
-		}
-
-		for (int i = 0; i < (int)(rom.size() - 8); i++)
-		{
-		    if (strncmp((const char*)&rom[i], "FLASH_V", 7) == 0)
-		    {
-			type = CartridgeType::CartFlash64K;
-			return type;
+			case 0x45:
+			{
+			    if ((strncmp((const char*)&rom[i], "EEPROM", 6) == 0))
+			    {
+				cout << "EEPROM" << endl;
+				type = CartridgeType::CartEEPROM;
+				return type;
+			    }
+			}
+			break;
+			case 0x46:
+			{
+			    if ((strncmp((const char*)&rom[i], "FLASH_", 6) == 0))
+			    {
+				cout << "FLASH 64K" << endl;
+				type = CartridgeType::CartFlash64K;
+				return type;
+			    }
+			    else if ((strncmp((const char*)&rom[i], "FLASH512", 8) == 0))
+			    {
+				cout << "FLASH 64K" << endl;
+				type = CartridgeType::CartFlash64K;
+				return type;
+			    }
+			    else if ((strncmp((const char*)&rom[i], "FLASH1M", 7) == 0))
+			    {
+				cout << "FLASH 128K" << endl;
+				type = CartridgeType::CartFlash128K;
+				return type;
+			    }
+			}
+			break;
+			case 0x53:
+			{
+			    if ((strncmp((const char*)&rom[i], "SRAM", 4) == 0))
+			    {
+				cout << "SRAM" << endl;
+				type = CartridgeType::CartSRAM;
+				return type;
+			    }
+			}
+			break;
 		    }
 		}
 

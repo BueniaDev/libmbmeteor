@@ -29,6 +29,7 @@
 #include <vector>
 #include <utility>
 #include <iostream>
+#include <sstream>
 using namespace gba;
 using namespace std;
 
@@ -58,6 +59,8 @@ namespace gba
 	    void keypressed(Button button);
 	    void keyreleased(Button button);
 	    void runcore();
+	    bool savebackup();
+	    bool loadbackup();
 
 	    int overspentcycles = 0;
 

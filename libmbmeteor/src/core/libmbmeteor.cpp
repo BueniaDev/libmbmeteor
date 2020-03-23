@@ -51,15 +51,31 @@ namespace gba
 
 	corecpu->init();
 	coregpu->init();
+	loadbackup();
 	return true;
     }
 
     void GBACore::shutdown()
     {
+	savebackup();
 	coregpu->shutdown();
 	corecpu->shutdown();
 	coremmu->shutdown();
 	// coreapu->writeraw("test.raw");
+    }
+
+    bool GBACore::loadbackup()
+    {
+	stringstream rombackup;
+	rombackup << romname << ".sav";
+	return coremmu->loadbackup(rombackup.str());
+    }
+
+    bool GBACore::savebackup()
+    {
+	stringstream rombackup;
+	rombackup << romname << ".sav";
+	return coremmu->savebackup(rombackup.str());
     }
 
     void GBACore::printusage(char* argv)
