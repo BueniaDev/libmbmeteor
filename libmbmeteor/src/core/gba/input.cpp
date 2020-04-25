@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with libmbmeteor.  If not, see <https://www.gnu.org/licenses/>.
 
-#include "../../include/libmbmeteor/input.h"
+#include "../../../include/libmbmeteor/gba/input.h"
 using namespace gba;
 using namespace std;
 using namespace std::placeholders;

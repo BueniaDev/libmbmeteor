@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with libmbmeteor.  If not, see <https://www.gnu.org/licenses/>.
 
-#include "../../include/libmbmeteor/mmu.h"
+#include "../../../include/libmbmeteor/gba/mmu.h"
 using namespace gba;
 using namespace std;
 using namespace std::placeholders;
@@ -97,13 +97,8 @@ namespace gba
 			}
 			else
 			{
-				temp = readopenbus(addr);
+				temp = 0x00;
 			}
-		}
-		break;
-		case 0x1:
-		{
-			temp = readopenbus(addr);
 		}
 		break;
 		case 0x2:
@@ -145,8 +140,11 @@ namespace gba
 		break;
 	    case 0x8:
 	    {
-		waitstate = 0;
 		temp = gamerom[(addr - 0x8000000)];
+
+		
+		if (rtcenable || solarenable)
+		{
 
 		if ((addr >= 0x80000C4) && (addr < 0x80000CA))
 		{
@@ -165,29 +163,27 @@ namespace gba
 			temp = 0x00;
 		    }
 		}
+
+		}
 	    }
 	    break;
 	    case 0x9:
 	    {
-		waitstate = 0;
 		temp = gamerom[(addr - 0x8000000)];
 	    }
 	    break;
 	    case 0xA:
 	    {
-		waitstate = 1;
 		temp = gamerom[(addr - 0xA000000)];
 	    }
 	    break;
 	    case 0xB:
 	    {
-		waitstate = 1;
 		temp = gamerom[(addr - 0xA000000)];
 	    }
 	    break;
 	    case 0xC:
 	    {
-		waitstate = 2;
 		temp = gamerom[(addr - 0xC000000)];
 	    }
 	    break;
@@ -229,7 +225,7 @@ namespace gba
 		}
 	    }
 	    break;
-	    default: temp = 0xFF; break;
+	    default: temp = 0x00; break;
 	}
 
 	return temp;
@@ -286,7 +282,7 @@ namespace gba
 		break;
 	    case 0x8:
 	    {
-		if (!rtcenable)
+		if (!rtcenable && !solarenable)
 		{
 		    return;
 		}
@@ -298,7 +294,16 @@ namespace gba
 			case 0xC4:
 			{
 			    gpiodata = (val & 0xF);
-			    processrtc();
+			    
+			    if (rtcenable)
+			    {
+			        processrtc();
+			    }
+
+			    if (solarenable)
+			    {
+				processsolar();
+			    }
 			}
 			break;
 			case 0xC6:
@@ -371,24 +376,354 @@ namespace gba
 
     uint16_t MMU::readWord(uint32_t addr)
     {
-	return ((readByte(addr + 1) << 8) | (readByte(addr)));
+	uint16_t temp = 0;
+
+	uint8_t addrtemp = (addr >> 24);
+
+	switch (addrtemp)
+	{
+		case 0x0:
+		{
+			if (addr < 0x4000)
+			{
+				temp = *(uint16_t*)&bios[addr];
+			}
+			else
+			{
+				temp = 0x00;
+			}
+		}
+		break;
+		case 0x2:
+		{
+			temp = *(uint16_t*)&wram256[(addr & 0x3FFFF)];
+		}
+		break;
+		case 0x3:
+		{
+			temp = *(uint16_t*)&wram32[(addr & 0x7FFF)];
+		}
+		break;
+		case 0x4:
+		{
+			temp = ((readByte(addr + 1) << 8) | (readByte(addr)));
+		}
+		break;
+		case 0x5:
+		{
+			temp = *(uint16_t*)&pram[(addr & 0x7FFF)];
+		}
+		break;
+		case 0x6:
+		{
+			temp = *(uint16_t*)&vram[(addr & 0x1FFFF)];
+		}
+		break;
+		case 0x7:
+		{
+			temp = *(uint16_t*)&oam[(addr & 0xFFF)];
+		}
+		break;
+	    case 0x8:
+	    {
+		temp = ((readByte(addr + 1) << 8) | (readByte(addr)));
+	    }
+	    break;
+	    case 0x9:
+	    {
+		temp = *(uint16_t*)&gamerom[(addr - 0x8000000)];
+	    }
+	    break;
+	    case 0xA:
+	    {
+		temp = *(uint16_t*)&gamerom[(addr - 0xA000000)];
+	    }
+	    break;
+	    case 0xB:
+	    {
+		temp = *(uint16_t*)&gamerom[(addr - 0xA000000)];
+	    }
+	    break;
+	    case 0xC:
+	    {
+		temp = *(uint16_t*)&gamerom[(addr - 0xC000000)];
+	    }
+	    break;
+	    case 0xD:
+	    {
+		temp = ((readByte(addr + 1) << 8) | (readByte(addr)));
+	    }
+	    break;
+	    case 0xE:
+	    {
+		temp = ((readByte(addr + 1) << 8) | (readByte(addr)));
+	    }
+	    break;
+	    default: temp = 0x00; break;
+	}
+
+	return temp;
     }
 
     void MMU::writeWord(uint32_t addr, uint16_t val)
     {
-	writeByte(addr, (val & 0xFF));
-	writeByte((addr + 1), (val >> 8));
+	uint8_t addrtemp = (addr >> 24);
+
+	switch (addrtemp)
+	{
+		case 0x0:
+		{
+		    return;
+		}
+		break;
+		case 0x1:
+		{
+		    return;
+		}
+		break;
+		case 0x2:
+		{
+			*(uint16_t*)&wram256[(addr & 0x3FFFF)] = val;
+		}
+		break;
+		case 0x3:
+		{
+			*(uint16_t*)&wram32[(addr & 0x7FFF)] = val;
+		}
+		break;
+		case 0x4:
+		{
+	    		writeByte(addr, (val & 0xFF));
+	    		writeByte((addr + 1), (val >> 8));
+		}
+		break;
+		case 0x5:
+		{
+			*(uint16_t*)&pram[(addr & 0x7FFF)] = val;
+		}
+		break;
+		case 0x6:
+		{
+			*(uint16_t*)&vram[(addr & 0x1FFFF)] = val;
+		}
+		break;
+		case 0x7:
+		{
+			*(uint16_t*)&oam[(addr & 0xFFF)] = val;
+		}
+		break;
+	    case 0x8:
+	    {
+	    	writeByte(addr, (val & 0xFF));
+	    	writeByte((addr + 1), (val >> 8));
+	    }
+	    break;
+	    case 0x9:
+	    {
+		return;
+	    }
+	    break;
+	    case 0xA:
+	    {
+		return;
+	    }
+	    break;
+	    case 0xD:
+	    {
+	    	writeByte(addr, (val & 0xFF));
+	    	writeByte((addr + 1), (val >> 8));
+	    }
+	    break;
+	    case 0xE:
+	    {
+	    	writeByte(addr, (val & 0xFF));
+	    	writeByte((addr + 1), (val >> 8));		
+	    }
+	    break;
+	    case 0xF:
+	    {
+		return;
+	    }
+	    break;
+	    default: return; break;
+	}
     }
 
     uint32_t MMU::readLong(uint32_t addr)
     {
-	return ((readWord(addr + 2) << 16) | (readWord(addr)));
+	uint32_t temp = 0;
+
+	uint8_t addrtemp = (addr >> 24);
+
+	switch (addrtemp)
+	{
+		case 0x0:
+		{
+			if (addr < 0x4000)
+			{
+				temp = *(uint32_t*)&bios[addr];
+			}
+			else
+			{
+				temp = 0x00;
+			}
+		}
+		break;
+		case 0x2:
+		{
+			temp = *(uint32_t*)&wram256[(addr & 0x3FFFF)];
+		}
+		break;
+		case 0x3:
+		{
+			temp = *(uint32_t*)&wram32[(addr & 0x7FFF)];
+		}
+		break;
+		case 0x4:
+		{
+			temp = ((readWord(addr + 2) << 16) | (readWord(addr)));
+		}
+		break;
+		case 0x5:
+		{
+			temp = *(uint32_t*)&pram[(addr & 0x7FFF)];
+		}
+		break;
+		case 0x6:
+		{
+			temp = *(uint32_t*)&vram[(addr & 0x1FFFF)];
+		}
+		break;
+		case 0x7:
+		{
+			temp = *(uint32_t*)&oam[(addr & 0xFFF)];
+		}
+		break;
+	    case 0x8:
+	    {
+		temp = ((readWord(addr + 2) << 16) | (readWord(addr)));
+	    }
+	    break;
+	    case 0x9:
+	    {
+		temp = *(uint32_t*)&gamerom[(addr - 0x8000000)];
+	    }
+	    break;
+	    case 0xA:
+	    {
+		temp = *(uint32_t*)&gamerom[(addr - 0xA000000)];
+	    }
+	    break;
+	    case 0xB:
+	    {
+		temp = *(uint32_t*)&gamerom[(addr - 0xA000000)];
+	    }
+	    break;
+	    case 0xC:
+	    {
+		temp = *(uint32_t*)&gamerom[(addr - 0xC000000)];
+	    }
+	    break;
+	    case 0xD:
+	    {
+		temp = ((readWord(addr + 2) << 16) | (readWord(addr)));
+	    }
+	    break;
+	    case 0xE:
+	    {
+		temp = ((readWord(addr + 2) << 16) | (readWord(addr)));
+	    }
+	    break;
+	    default: temp = 0x00; break;
+	}
+
+	return temp;
     }
 
     void MMU::writeLong(uint32_t addr, uint32_t val)
     {
-	writeWord(addr, (val & 0xFFFF));
-	writeWord((addr + 2), (val >> 16));
+	uint8_t addrtemp = (addr >> 24);
+
+	switch (addrtemp)
+	{
+		case 0x0:
+		{
+		    return;
+		}
+		break;
+		case 0x1:
+		{
+		    return;
+		}
+		break;
+		case 0x2:
+		{
+			*(uint32_t*)&wram256[(addr & 0x3FFFF)] = val;
+		}
+		break;
+		case 0x3:
+		{
+			*(uint32_t*)&wram32[(addr & 0x7FFF)] = val;
+		}
+		break;
+		case 0x4:
+		{
+			writeWord(addr, (val & 0xFFFF));
+			writeWord((addr + 2), (val >> 16));
+		}
+		break;
+		case 0x5:
+		{
+			*(uint32_t*)&pram[(addr & 0x7FFF)] = val;
+		}
+		break;
+		case 0x6:
+		{
+			*(uint32_t*)&vram[(addr & 0x1FFFF)] = val;
+		}
+		break;
+		case 0x7:
+		{
+			*(uint32_t*)&oam[(addr & 0xFFF)] = val;
+		}
+		break;
+	    case 0x8:
+	    {
+		writeWord(addr, (val & 0xFFFF));
+		writeWord((addr + 2), (val >> 16));
+	    }
+	    break;
+	    case 0x9:
+	    {
+		return;
+	    }
+	    break;
+	    case 0xA:
+	    {
+		return;
+	    }
+	    break;
+	    case 0xD:
+	    {
+		writeWord(addr, (val & 0xFFFF));
+		writeWord((addr + 2), (val >> 16));
+	    }
+	    break;
+	    case 0xE:
+	    {
+		writeWord(addr, (val & 0xFFFF));
+		writeWord((addr + 2), (val >> 16));		
+	    }
+	    break;
+	    case 0xF:
+	    {
+		return;
+	    }
+	    break;
+	    default: return; break;
+	}
+
+
     }
 
     void MMU::processrtc()
@@ -397,19 +732,19 @@ namespace gba
 	{
 	    case 0:
 	    {
-		if ((gpiodata & 0x5) == 0x1)
+		if ((gpiodata & 0x5) == 1)
 		{
-		    rtcstate += 1;
+		    rtcstate = 1;
 		}
 	    }
 	    break;
 	    case 1:
 	    {
-		if ((gpiodata & 0x5) == 0x5)
+		if ((gpiodata & 0x5) == 5)
 		{
+		    rtcstate = 2;
 		    rtccounter = 0;
 		    rtcbyte = 0;
-		    rtcstate += 1;
 		}
 	    }
 	    break;
@@ -422,167 +757,167 @@ namespace gba
 
 		    if (rtccounter == 8)
 		    {
-			if ((rtcbyte & 0xF0) == 0x60)
+			if ((rtcbyte & 0xF0) != 0x60)
 			{
-			    int param = ((rtcbyte >> 1) & 0x7);
-			    bool readdata = TestBit(rtcbyte, 0);
+			    cout << "Byte is flawed" << endl;
+			    exit(1);
+			    return;
+			}
 
-			    switch (param)
+			int command = ((rtcbyte >> 1) & 0x7);
+			bool readbit = TestBit(rtcbyte, 0);
+
+			switch (command)
+			{
+			    case 0:
 			    {
-				case 0:
-				{
-				    rtcstate = 0;
-				}
-				break;
-				case 1:
-				{
-				    if (readdata)
-				    {
-					rtcdata[0] = rtccontrol;
-					rtcserlen = 1;
-					rtcsercount = 0;
-					rtcindex = 0;
-					rtcstate = 3;
-				    }
-				    else
-				    {
-					rtcserlen = 1;
-					rtcsercount = 0;
-					rtcindex = 0;
-					rtcstate = 4;
-				    }
-				}
-				break;
-				case 2:
-				{
-				    if (readdata)
-				    {
-					rtcserlen = 7;
-					rtcsercount = 0;
-					rtcindex = 0;
-					rtcstate = 3;
-					uint8_t rawhours = 0;
-
-					time_t systime = time(0);
-					tm* currtime = localtime(&systime);
-
-					rtcdata[0] = (currtime->tm_year % 100);
-					rtcdata[0] = getbcd(rtcdata[0]);
-
-					rtcdata[1] = (currtime->tm_mon + 1);
-					rtcdata[1] = getbcd(rtcdata[1]);
-
-					rtcdata[2] = currtime->tm_mday;
-					rtcdata[2] = getbcd(rtcdata[2]);
-
-					rtcdata[3] = currtime->tm_wday;
-					rtcdata[3] = getbcd(rtcdata[3]);
-
-					rtcdata[4] = currtime->tm_hour;
-					rtcdata[4] = TestBit(rtccontrol, 6) ? (rtcdata[4] % 24) : (rtcdata[4] % 12);
-					rawhours = rtcdata[4];
-					rtcdata[4] = getbcd(rtcdata[4]);
-
-					rtcdata[5] = currtime->tm_min;
-					rtcdata[5] = (rtcdata[5] % 60);
-					rtcdata[5] = getbcd(rtcdata[5]);
-					
-					rtcdata[6] = currtime->tm_sec;
-
-					if (rtcdata[6] > 59)
-					{
-					    rtcdata[6] = 59;
-					}
-
-					rtcdata[6] = (rtcdata[6] % 60);
-					rtcdata[6] = getbcd(rtcdata[6]);
-				    }
-				}
-				break;
-				case 3:
-				{
-				    if (readdata)
-				    {
-					rtcserlen = 3;
-					rtcsercount = 0;
-					rtcindex = 0;
-					rtcstate = 3;
-					uint8_t rawhours = 0;
-
-					time_t systime = time(0);
-					tm* currtime = localtime(&systime);
-
-					rtcdata[0] = currtime->tm_hour;
-					rtcdata[0] = TestBit(rtccontrol, 6) ? (rtcdata[0] % 24) : (rtcdata[0] % 12);
-					rawhours = rtcdata[0];
-					rtcdata[0] = getbcd(rtcdata[0]);
-
-					rtcdata[1] = currtime->tm_min;
-					rtcdata[1] = (rtcdata[1] % 60);
-					rtcdata[1] = getbcd(rtcdata[1]);
-
-					rtcdata[2] = currtime->tm_sec;
-
-					if (rtcdata[2] > 59)
-					{
-					    rtcdata[2] = 59;
-					}
-
-					rtcdata[2] = (rtcdata[2] % 60);
-					rtcdata[2] = getbcd(rtcdata[2]);
-				    }
-				}
-				break;
-				default: cout << "Unrecognized RTC commmand of " << dec << (int)(param) << endl; exit(1); break;
+				rtcdtregs.reset();
+				rtcstate = 0;
 			    }
+			    break;
+			    case 1:
+			    {
+				if (readbit)
+				{
+				    rtclength = 1;
+				    rtcdata = rtcdtregs.readcontrol();
+				    rtcstate = 3;
+				}
+				else
+				{
+				    rtclength = 1;
+				    rtcstate = 4;
+				    rtcwritetype = 0;
+				}
+			    }
+			    break;
+			    case 2:
+			    {
+				if (readbit)
+				{
+				    rtclength = 7;
+				    rtcdata = rtcdtregs.readdatetime();
+				    rtcstate = 3;
+				}
+				else
+				{
+				    rtclength = 7;
+				    rtcstate = 4;
+				    rtcwritetype = 1;
+				}
+			    }
+			    break;
+			    case 3:
+			    {
+				if (readbit)
+				{
+				    rtclength = 3;
+				    rtcdata = rtcdtregs.readtime();
+				    rtcstate = 3;
+				}
+				else
+				{
+				    rtclength = 3;
+				    rtcstate = 4;
+				    rtcwritetype = 2;
+				}
+			    }
+			    break;
+			    default: cout << "Unrecognized command of " << dec << (int)(command) << endl; exit(1); break;
 			}
 		    }
 		}
 	    }
 	    break;
-	    case 0x3:
+	    case 3:
 	    {
 		if (TestBit(gpiodata, 0))
 		{
-		    gpiodata = BitChange(gpiodata, 1, TestBit(rtcdata[rtcindex], 0));
+		    gpiodata = BitChange(gpiodata, 1, TestBit(rtcdata[rtcserial], 0));
 
-		    rtcdata[rtcindex] >>= 1;
-		    rtcsercount += 1;
+		    rtcdata[rtcserial] >>= 1;
+		    rtcbitcounter += 1;
 
-		    if (rtcsercount == 8)
+		    if (rtcbitcounter == 8)
 		    {
-			rtcsercount = 0;
-			rtcindex += 1;
+			rtcbitcounter = 0;
+			rtcserial += 1;
 
-			if (rtcindex == rtcserlen)
+			if (rtcserial == rtclength)
 			{
+			    rtcdata.fill(0);
 			    rtcstate = 0;
+			    rtcserial = 0;
+			    rtclength = 0;
 			}
 		    }
 		}
 	    }
 	    break;
-	    case 0x4:
+	    case 4:
 	    {
 		if (!TestBit(gpiodata, 0))
 		{
-		    rtcdata[rtcindex] = BitChange(rtcdata[rtcindex], rtcsercount, TestBit(gpiodata, 1));
+		    rtcdata[rtcserial] = BitChange(rtcdata[rtcserial], rtcbitcounter, TestBit(gpiodata, 1));
 
-		    rtcsercount += 1;
+		    rtcbitcounter += 1;
 
-		    if (rtcsercount == 8)
+		    if (rtcbitcounter == 8)
 		    {
-			rtcsercount = 0;
-			rtcindex += 1;
+			rtcbitcounter = 0;
+			rtcserial += 1;
 
-			if (rtcindex == rtcserlen)
+			if (rtcserial == rtclength)
 			{
+			    rtcdtregs.writeregisters(rtcwritetype, rtcdata);
+			    rtcdata.fill(0);
 			    rtcstate = 0;
+			    rtcserial = 0;
+			    rtclength = 0;
+			    rtcwritetype = 3;
 			}
 		    }
 		}
 	    }
 	    break;
+	}
+    }
+
+    void MMU::processsolar()
+    {
+	if (TestBit(gpiodata, 1))
+	{
+	    solarcounter = 0;
+	}
+
+	if (TestBit(gpiodata, 0))
+	{
+	    solarcounter += 1;
+
+	    if (solarcounter == solarvalue)
+	    {
+		gpiodata = BitSet(gpiodata, 3);
+	    }
+	}
+    }
+
+    void MMU::increasesolar()
+    {
+	solarvalue -= 8;
+
+	if (solarvalue < 0x50)
+	{
+	    solarvalue = 0x50;
+	}
+    }
+
+    void MMU::decreasesolar()
+    {
+	solarvalue += 8;
+
+	if (solarvalue >= 0xE8)
+	{
+	    solarvalue = 0xE8;
 	}
     }
 
@@ -1192,6 +1527,7 @@ namespace gba
 	    }
 
 	    rtcenable = isrtcsupported(gamerom);
+	    solarenable = issolarsupported(gamerom);
 
 	    cout << "File succesfully loaded." << endl;
 	    file.close();

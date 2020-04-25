@@ -133,6 +133,22 @@ namespace gba
 	coreinput->keyreleased(button);
     }
 
+    void GBACore::increasesolar()
+    {
+	if (coremmu->solarenable)
+	{
+	    coremmu->increasesolar();
+	}
+    }
+
+    void GBACore::decreasesolar()
+    {
+	if (coremmu->solarenable)
+	{
+	    coremmu->decreasesolar();
+	}
+    }
+
     void GBACore::setaudiocallback(apuoutput cb)
     {
 	coreapu->setaudiocallback(cb);

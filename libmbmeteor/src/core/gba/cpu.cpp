@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with libmbmeteor.  If not, see <https://www.gnu.org/licenses/>.
 
-#include "../../include/libmbmeteor/cpu.h"
+#include "../../../include/libmbmeteor/gba/cpu.h"
 using namespace gba;
 using namespace std;
 

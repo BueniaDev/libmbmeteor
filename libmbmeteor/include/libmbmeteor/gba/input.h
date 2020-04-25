@@ -17,7 +17,6 @@
 #ifndef LIBMBMETEOR_INPUT
 #define LIBMBMETEOR_INPUT
 
-#include "libmbmeteor_api.h"
 #include "mmu.h"
 #include <functional>
 using namespace gba;

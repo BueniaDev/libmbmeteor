@@ -86,15 +86,15 @@ namespace gba
 
 		if (val < 0x2000000)
 		{
-		    temp = 2;
+		    temp = 1;
 		}
 		else if (val < 0x2040000)
 		{
-		    temp = 3;
+		    temp = (3 << TestBit(flags, 0));
 		}
 		else if (val < 0x3000000)
 		{
-		    temp = 2;
+		    temp = 1;
 		}
 		else if (val < 0x4000000)
 		{
@@ -102,19 +102,19 @@ namespace gba
 		}
 		else if (val < 0x5000000)
 		{
-		    temp = 2;
+		    temp = 1;
 		}
 		else if (val < 0x6000000)
 		{
-		    temp = 2;
+		    temp = (1 + TestBit(flags, 0));
 		}
 		else if (val < 0x7000000)
 		{
-		    temp = 2;
+		    temp = (1 + TestBit(flags, 0));
 		}
 		else if (val < 0x8000000)
 		{
-		    temp = 2;
+		    temp = 1;
 		}
 		else if (val < 0xA000000)
 		{
@@ -132,11 +132,11 @@ namespace gba
 			    case 3: ftemp = 9; break;
 			}
 
-			temp = ftemp;
+			temp = (ftemp << TestBit(flags, 0));
 		    }
 		    else
 		    {
-			temp = TestBit(mem.waitcnt, 4) ? 2 : 3;
+			temp = ((TestBit(mem.waitcnt, 4) ? 2 : 3) << TestBit(flags, 0));
 		    }
 		}
 		else if (val < 0xC000000)
@@ -145,7 +145,7 @@ namespace gba
 		    {
 			int ftemp = 1;
 
-			int nonseq = ((mem.waitcnt >> 2) & 0x3);
+			int nonseq = ((mem.waitcnt >> 5) & 0x3);
 
 			switch (nonseq)
 			{
@@ -155,38 +155,50 @@ namespace gba
 			    case 3: ftemp = 9; break;
 			}
 
-			temp = ftemp;
+			temp = (ftemp << TestBit(flags, 0));
 		    }
 		    else
 		    {
-			temp = TestBit(mem.waitcnt, 7) ? 2 : 5;
+			temp = ((TestBit(mem.waitcnt, 7) ? 2 : 5) << TestBit(flags, 0));
 		    }
-		}
-		else if (val < 0xD000000)
-		{
-		    temp = 2;
 		}
 		else if (val < 0xE000000)
 		{
-		    if (mem.iseeprom())
+		    if (TestBit(flags, 1))
 		    {
-			temp = 9;
+			int ftemp = 1;
+
+			int nonseq = ((mem.waitcnt >> 8) & 0x3);
+
+			switch (nonseq)
+			{
+			    case 0: ftemp = 5; break;
+			    case 1: ftemp = 4; break;
+			    case 2: ftemp = 3; break;
+			    case 3: ftemp = 9; break;
+			}
+
+			temp = (ftemp << TestBit(flags, 0));
 		    }
 		    else
 		    {
-			temp = 2;
+			temp = ((TestBit(mem.waitcnt, 10) ? 2 : 9) << TestBit(flags, 0));
 		    }
 		}
 		else if (val < 0xF000000)
 		{
-		    if (!mem.iseeprom())
+		    int ftemp = 5;
+		    int nonseq = (mem.waitcnt & 0x3);
+
+		    switch (nonseq)
 		    {
-			temp = 9;
+			case 0: ftemp = 5; break;
+			case 1: ftemp = 4; break;
+			case 2: ftemp = 3; break;
+			case 3: ftemp = 9; break;
 		    }
-		    else
-		    {
-			temp = 2;
-		    }
+
+		    temp = ftemp;
 		}
 		else
 		{
@@ -201,13 +213,27 @@ namespace gba
 		clockcycles += 1;
 		gpu.updatelcd();
 		timer.updatetimers();
-		mem.updatedma();
 		apu.updateapu();
 	    }
 
 	    void softwareinterrupt(uint32_t val)
 	    {
 		mem.softwareinterrupt();
+	    }
+
+	    int getversion()
+	    {
+		return 4;
+	    }
+
+	    uint32_t readcoprocessor(uint16_t id)
+	    {
+		return 0;
+	    }
+
+	    void writecoprocessor(uint16_t id, uint32_t val)
+	    {
+		return;
 	    }
     };
 

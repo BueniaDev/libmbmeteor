@@ -96,6 +96,8 @@ void processinput(SDL_Event event)
 	    case SDLK_UP: core.keypressed(Button::Up); break;
 	    case SDLK_DOWN: core.keypressed(Button::Down); break;
 	    case SDLK_q: screenshot(); break;
+	    case SDLK_EQUALS: core.increasesolar(); break;
+	    case SDLK_MINUS: core.decreasesolar(); break;
 	}
     }
     else if (event.type == SDL_KEYUP)

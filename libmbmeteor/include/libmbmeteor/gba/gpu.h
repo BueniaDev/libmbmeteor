@@ -17,7 +17,6 @@
 #ifndef LIBMBMETEOR_GPU
 #define LIBMBMETEOR_GPU
 
-#include "libmbmeteor_api.h"
 #include "mmu.h"
 #include <iostream>
 #include <functional>
@@ -433,6 +432,11 @@ namespace gba
 
 			    uint16_t tempcolor = (((blue & 0x1F) << 10) | ((green & 0x1F) << 5) | (red & 0x1F));
 			    return (tempcolor & 0x7FFF);
+			}
+
+			bool isnothblankvblank()
+			{
+			    return (phase != Phase::VBlankHBlank);
 			}
 
 			void vblank(bool val)

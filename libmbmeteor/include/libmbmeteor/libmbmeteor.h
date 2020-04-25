@@ -17,12 +17,14 @@
 #ifndef LIBMBMETEOR_H
 #define LIBMBMETEOR_H
 
-#include "mmu.h"
-#include "cpu.h"
-#include "gpu.h"
-#include "apu.h"
-#include "input.h"
-#include "timers.h"
+#include "gba/mmu.h"
+#include "gba/cpu.h"
+#include "gba/gpu.h"
+#include "gba/apu.h"
+#include "gba/input.h"
+#include "gba/timers.h"
+#include "nds/mmu.h"
+#include "nds/cpu.h"
 #include "libmbmeteor_api.h"
 #include <cstring>
 #include <memory>
@@ -58,6 +60,8 @@ namespace gba
 	    RGB getpixel(int x, int y);
 	    void keypressed(Button button);
 	    void keyreleased(Button button);
+	    void increasesolar();
+	    void decreasesolar();
 	    void runcore();
 	    bool savebackup();
 	    bool loadbackup();
@@ -74,6 +78,72 @@ namespace gba
 
 	    string romname;
 	    string biosname;
+    };
+
+    class LIBMBMETEOR_API NDSCore
+    {
+	public:
+	    NDSCore()
+	    {
+		coremmu = make_unique<NDSMMU>();
+		corecpu = make_unique<NDSCPU>(*coremmu);
+	    }
+
+	    ~NDSCore()
+	    {
+
+	    }
+
+	    unique_ptr<NDSMMU> coremmu;
+	    unique_ptr<NDSCPU> corecpu;
+
+	    int overspentcycles = 0;
+
+	    bool loadBIOS(string filename1, string filename2)
+	    {
+		return (coremmu->loadBIOS9(filename1) && coremmu->loadBIOS7(filename2));
+	    }
+
+	    bool loadfirmware(string filename)
+	    {
+		return coremmu->loadfirmware(filename);
+	    }
+
+	    void runcore()
+	    {
+		overspentcycles = corecpu->runfor((1100000 + overspentcycles));
+	    }
+    };
+
+    class LIBMBMETEOR_API mbMeteor
+    {
+	public:
+	    mbMeteor()
+	    {
+
+	    }
+
+	    ~mbMeteor()
+	    {
+
+	    }
+
+	    NDSCore nds;
+
+	    bool loadBIOS(string filename1, string filename2)
+	    {
+		return nds.loadBIOS(filename1, filename2);
+	    }
+
+	    bool loadfirmware(string filename)
+	    {
+		return nds.loadfirmware(filename);
+	    }
+
+	    void runcore()
+	    {
+		nds.runcore();
+	    }
     };
 };
 

@@ -17,7 +17,7 @@
 #ifndef LIBMBMETEOR_MMU
 #define LIBMBMETEOR_MMU
 
-#include "libmbmeteor_api.h"
+#include "../libmbmeteor_api.h"
 #include <cstdint>
 #include <vector>
 #include <iostream>
@@ -56,6 +56,8 @@ namespace gba
 	    vector<uint8_t> gameeeprom;
 	    vector<uint8_t> gameflash;
 
+	    array<uint8_t, 0x1000000> memorymap;
+
 	    // GPIO Stuff
 	    bool rtcenable = false;
 	    bool isgpioreadable = false;
@@ -64,12 +66,130 @@ namespace gba
 	    int rtcstate = 0;
 	    int rtccounter = 0;
 	    uint8_t rtcbyte = 0;
-	    uint8_t rtcdata[7] = {0, 0, 0, 0, 0, 0, 0};
-	    uint8_t rtccontrol = 0x40;
-	    int rtcserlen = 0;
-	    int rtcsercount = 0;
-	    int rtcindex = 0;
+	    array<uint8_t, 7> rtcdata = {{0}};
+	    int rtclength = 0;
+	    int rtcserial = 0;
+	    int rtcbitcounter = 0;
+	    int rtcwritetype = 3;
 	    void processrtc();
+
+	    struct RTCDateTime
+	    {
+		uint8_t control = 0x40;
+
+		int year = 0;
+		int month = 1;
+		int day = 1;
+		int week = 0;
+		int hours = 0;
+		int minutes = 0;
+		int seconds = 0;
+
+		void reset()
+		{
+		    year = 0;
+		    month = 1;
+		    day = 1;
+		    week = 0;
+		    hours = 0;
+		    minutes = 0;
+		    seconds = 0;
+		}
+
+		void writeregisters(int regtype, array<uint8_t, 7> &val)
+		{
+		    switch ((regtype & 0x3))
+		    {
+			case 0:
+			{
+			    writecontrol(val);
+			}
+			break;
+			case 1:
+			{
+			    return;
+			}
+			break;
+			case 2:
+			{
+			    return;
+			}
+			break;
+			case 3: return; break;
+		    }
+		}
+
+	 	uint16_t tobcd(uint16_t temp)
+		{
+		    return (((temp / 10) << 4) | (temp % 10));
+		}
+
+		void updatertctime()
+		{
+		    time_t currenttime = time(NULL);
+
+		    tm *rtctime = localtime(&currenttime);
+
+		    year = tobcd((rtctime->tm_year - 100));
+		    month = tobcd((rtctime->tm_mon + 1));
+		    day = tobcd(rtctime->tm_mday);
+		    week = tobcd(rtctime->tm_wday);
+		    hours = tobcd((rtctime->tm_hour % (12 << TestBit(control, 6))));
+		    minutes = tobcd((rtctime->tm_min % 60));
+		    int realsecs = (rtctime->tm_sec > 59) ? 59 : rtctime->tm_sec;
+		    seconds = tobcd((realsecs % 60));	    
+		}
+
+		array<uint8_t, 7> readcontrol()
+		{
+		    array<uint8_t, 7> temp = {{0}};
+
+		    temp[0] = control;
+
+		    return temp;
+		}
+
+		void writecontrol(array<uint8_t, 7> &val)
+		{
+		    cout << hex << (int)(val[0]) << endl;
+		    control = val[0];
+		}
+
+		array<uint8_t, 7> readdatetime()
+		{
+		    updatertctime();
+		    array<uint8_t, 7> temp = {{0}};
+		    temp[0] = year;
+		    temp[1] = month;
+		    temp[2] = day;
+		    temp[3] = week;
+		    temp[4] = hours;
+		    temp[5] = minutes;
+		    temp[6] = seconds;
+
+		    return temp;
+		}
+
+		array<uint8_t, 7> readtime()
+		{
+		    updatertctime();
+		    array<uint8_t, 7> temp = {{0}};
+		    temp[0] = hours;
+		    temp[1] = minutes;
+		    temp[2] = seconds;
+
+		    return temp;
+		}
+	    };
+
+	    RTCDateTime rtcdtregs;
+
+	    bool solarenable = false;
+	    int solarcounter = 0;
+	    int solarvalue = 0xE8;
+	    void processsolar();
+	    void increasesolar();
+	    void decreasesolar();
 
 	    string getgamecodef3(vector<uint8_t> &rom)
 	    {
@@ -97,6 +217,11 @@ namespace gba
 		}
 
 		return temp;
+	    }
+
+	    bool issolarsupported(vector<uint8_t> &rom)
+	    {
+		return (rom[0xAC] == 0x55);
 	    }
 
 	    uint32_t getbcd(uint32_t val)

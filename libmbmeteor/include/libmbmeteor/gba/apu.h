@@ -17,7 +17,6 @@
 #ifndef LIBMBMETEOR_APU
 #define LIBMBMETEOR_APU
 
-#include "libmbmeteor_api.h"
 #include "mmu.h"
 #include <functional>
 #include <queue>
@@ -58,7 +57,7 @@ namespace gba
 		}
 	    }
 
-	    int samplecounter;
+	    int samplecounter = 0;
 	    int maxsamples = (16780000 / 48000);
 
 	    apuoutput apufunc;
@@ -76,7 +75,7 @@ namespace gba
 
 	    int psgvolume = 0;
 
-	    int frametimer = 0;
+	    uint64_t frametimer = 0;
 	    uint8_t s1sweep = 0;
 	    uint8_t s1length = 0;
 	    int s1lengthcounter = 0;
@@ -105,6 +104,139 @@ namespace gba
 	    void s1envelopetick(int frameseq);
 	    void s1timertick();
 	    float gets1outputvol();
+
+	    uint8_t s2length = 0;
+	    int s2lengthcounter = 0;
+	    uint8_t s2envelope = 0;
+	    uint8_t s2freqlo = 0;
+	    uint8_t s2freqhi = 0;
+	    array<int, 8> s2dutycycle;
+	    
+	    bool s2enabled = false;
+	    bool s2envelopeenabled = false;
+	    bool s2negative = false;
+	    uint16_t s2shadowfreq = 0;
+	    int s2sweepcounter = 0;
+	    int s2envelopecounter = 0;
+	    int s2volume = 0;
+	    int s2periodtimer = 0;
+	    int s2seqpointer = 0;
+	    bool prevs2lengthdec = false;
+	    bool prevs2envelopeinc = false;
+
+	    inline void s2update(int frameseq);
+	    void s2sweeptick(int frameseq);
+	    void s2lengthcountertick(int frameseq);
+	    void s2envelopetick(int frameseq);
+	    void s2timertick();
+	    float gets2outputvol();
+
+	    int noiselength = 0;
+	    int noiselengthcounter = 0;
+	    int noiseenvelope = 0;
+	    bool noiseenvelopeenabled = false;
+	    int noiseenvelopecounter = 0;
+	    int noiseperiodtimer = 0;
+	    uint8_t noisefreqlo = 0;
+	    uint8_t noisefreqhi = 0;
+	    int noisevolume = 0;
+	    uint16_t noiselfsr = 1;
+	    bool noiseenabled = false;
+	    bool prevnoiselengthdec = false;
+	    bool prevnoiseenvelopeinc = false;
+
+	    void noiseupdate(int frameseq);
+	    void noiselengthcountertick(int frameseq);
+	    inline void noiseenvelopetick(int frameseq);
+	    inline void noisetimertick();
+	    float getnoiseoutputvol();
+
+	    inline bool noiseenabledleft()
+	    {
+		return (noiseenabled && (TestBit(soundselect, 7)));
+	    }
+
+	    inline bool noiseenabledright()
+	    {
+		return (noiseenabled && (TestBit(soundselect, 3)));
+	    }
+		
+	    inline void reloadnoiselengthcounter()
+	    {
+		noiselengthcounter = (64 - (noiselength & 0x3F));
+		noiselength &= 0xC0;
+	    }
+
+	    inline void writenoiseenvelope(uint8_t value)
+	    {
+		noiseenvelope = value;
+
+		if (((noiseenvelope & 0xF0) >> 4) == 0)
+		{
+		    noiseenabled = false;
+		}
+	    }
+
+	    inline void noisewritereset(uint8_t value)
+	    {
+		bool lengthwasenable = TestBit(noisefreqhi, 6);
+		noisefreqhi = (value & 0xC0);
+
+		if (apulengthlow() && !lengthwasenable && TestBit(noisefreqhi, 6) && noiselengthcounter > 0)
+		{
+		    noiselengthcounter -= 1;
+
+		    if (noiselengthcounter == 0)
+		    {
+			noiseenabled = false;
+		    }
+		}
+
+		if (TestBit(noisefreqhi, 7))
+		{
+		    noiseresetchannel();
+		}
+	    }
+
+	    inline void noisereloadperiod()
+	    {
+		uint32_t clockdivider = max(((noisefreqlo & 0x07) << 1), 1);
+		noiseperiodtimer = (clockdivider << (((noisefreqlo & 0xF0) >> 4) + 2));
+	    }
+
+	    inline void noiseresetchannel()
+	    {
+		noiseenabled = true;
+		noisereloadperiod();
+		noisefreqhi &= 0x7F;
+
+		noisevolume = ((noiseenvelope & 0xF0) >> 4);
+		noiseenvelopecounter = (noiseenvelope & 0x07);
+		noiseenvelopeenabled = (noiseenvelopecounter != 0);
+
+
+		if ((!TestBit(noiseenvelope, 3) && noisevolume == 0) || (TestBit(noiseenvelope, 3) && noisevolume == 0x0F))
+		{
+		    noiseenvelopeenabled = false;
+		}
+
+		if (noiselengthcounter == 0)
+		{
+		    noiselengthcounter = 64;
+
+		    if (apulengthlow() && TestBit(noisefreqhi, 6))
+		    {
+			noiselengthcounter -= 1;
+		    }
+		}
+	
+		noiselfsr = 0xFFFF;
+
+		if (noisevolume == 0)
+		{
+		    noiseenabled = false;
+		}
+	    }
 
 	    int mastervolume = 0;
 	    uint8_t soundselect = 0;
@@ -239,6 +371,88 @@ namespace gba
 	    {
 		int frequency = (s1freqlo | ((s1freqhi & 0x07) << 8));
 		s1periodtimer = ((2048 - frequency) << 1);
+	    }
+
+	    inline void reloads2lengthcounter()
+	    {
+		s2lengthcounter = (64 - (s2length & 0x3F));
+		s2length &= 0xC0;	
+	    }
+
+	    inline void sets2dutycycle()
+	    {
+		switch ((s2length & 0xC0) >> 6)
+		{
+		    case 0: s2dutycycle = {{false, false, false, false, false, false, false, true}}; break;
+		    case 1: s2dutycycle = {{true, false, false, false, false, false, false, true}}; break;
+		    case 2: s2dutycycle = {{true, false, false, false, false, true, true, true}}; break;
+		    case 3: s2dutycycle = {{false, true, true, true, true, true, true, false}}; break;
+		    default: break;
+		}
+	    }
+
+	    inline bool s2enabledleft()
+	    {
+		return (s2enabled && (TestBit(soundselect, 5)));
+	    }
+
+	    inline bool s2enabledright()
+	    {
+		return (s2enabled && (TestBit(soundselect, 1)));
+	    }
+
+	    inline void s2writereset(uint8_t value)
+	    {
+		bool lengthwasenable = TestBit(s2freqhi, 6);
+		s2freqhi = (value & 0xC7);
+
+		if (apulengthlow() && !lengthwasenable && TestBit(s2freqhi, 6) && s2lengthcounter > 0)
+		{
+		    s2lengthcounter -= 1;
+
+		    if (s2lengthcounter == 0)
+		    {
+			s2enabled = false;
+		    }
+		}
+
+		if (TestBit(s2freqhi, 7))
+		{
+		    s2resetchannel();
+		}
+	    }
+
+	    inline void s2resetchannel()
+	    {
+		s2enabled = true;
+		s2reloadperiod();
+		s2freqhi &= 0x7F;
+
+		s2volume = ((s2envelope & 0xF0) >> 4);
+		s2envelopecounter = (s2envelope & 0x07);
+		s2envelopeenabled = (s2envelopecounter != 0);
+
+
+		if ((!TestBit(s2envelope, 3) && s2volume == 0) || (TestBit(s2envelope, 3) && s2volume == 0x0F))
+		{
+		    s2envelopeenabled = false;
+		}
+
+		if (s2lengthcounter == 0)
+		{
+		    s2lengthcounter = 64;
+
+		    if (apulengthlow() && TestBit(s2freqhi, 6))
+		    {
+			s2lengthcounter -= 1;
+		    }
+		}
+	    }
+		
+	    inline void s2reloadperiod()
+	    {
+		int frequency = (s2freqlo | ((s2freqhi & 0x07) << 8));
+		s2periodtimer = ((2048 - frequency) << 1);
 	    }
 
 	    bool dma1fiforec = false;

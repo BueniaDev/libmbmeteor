@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.0.2)
 project(libmbmeteor)
 
 option(BUILD_EXAMPLE "Enables the example renderer." OFF)
+option(BUILD_NDS "Builds the NDS core (currently WIP)." ON)
 
 if (WIN32)
 	message(STATUS "Operating system is Windows.")
@@ -18,21 +19,25 @@ set(LIBMBMETEOR_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/libmbmeteor/include")
 
 set(LIBMBMETEOR_API_HEADERS
 	libmbmeteor/include/libmbmeteor/libmbmeteor_api.h
-	libmbmeteor/include/libmbmeteor/mmu.h
-	libmbmeteor/include/libmbmeteor/cpu.h
-	libmbmeteor/include/libmbmeteor/gpu.h
-	libmbmeteor/include/libmbmeteor/apu.h
-	libmbmeteor/include/libmbmeteor/timers.h
-	libmbmeteor/include/libmbmeteor/input.h
+	libmbmeteor/include/libmbmeteor/gba/mmu.h
+	libmbmeteor/include/libmbmeteor/gba/cpu.h
+	libmbmeteor/include/libmbmeteor/gba/gpu.h
+	libmbmeteor/include/libmbmeteor/gba/apu.h
+	libmbmeteor/include/libmbmeteor/gba/timers.h
+	libmbmeteor/include/libmbmeteor/gba/input.h
+	libmbmeteor/include/libmbmeteor/nds/mmu.h
+	libmbmeteor/include/libmbmeteor/nds/cpu.h
 	libmbmeteor/include/libmbmeteor/libmbmeteor.h)
 
 set(LIBMBMETEOR
-	libmbmeteor/src/core/mmu.cpp
-	libmbmeteor/src/core/cpu.cpp
-	libmbmeteor/src/core/gpu.cpp
-	libmbmeteor/src/core/apu.cpp
-	libmbmeteor/src/core/timers.cpp
-	libmbmeteor/src/core/input.cpp
+	libmbmeteor/src/core/gba/mmu.cpp
+	libmbmeteor/src/core/gba/cpu.cpp
+	libmbmeteor/src/core/gba/gpu.cpp
+	libmbmeteor/src/core/gba/apu.cpp
+	libmbmeteor/src/core/gba/timers.cpp
+	libmbmeteor/src/core/gba/input.cpp
+	libmbmeteor/src/core/nds/mmu.cpp
+	libmbmeteor/src/core/nds/cpu.cpp
 	libmbmeteor/src/core/libmbmeteor.cpp)
 
 add_subdirectory(external)
@@ -40,6 +45,10 @@ add_definitions(-DBEEARM_ENABLE_THUMB)
 
 if (BUILD_EXAMPLE STREQUAL "ON")
 	add_subdirectory(example/sdl2)
+endif()
+
+if (BUILD_NDS STREQUAL "ON")
+	add_subdirectory(example/nds)
 endif()
 
 if (WIN32)
