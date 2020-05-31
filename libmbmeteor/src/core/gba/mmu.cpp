@@ -93,11 +93,22 @@ namespace gba
 		{
 			if (addr < 0x4000)
 			{
-				temp = bios[addr];
+				int shift = ((addr & 3) << 3);
+				int tempaddr = (addr & ~3);
+				
+				if (memarm.getreg(15) >= 0x4000)
+				{
+				    temp = (lastbiosvalue >> shift);
+				}
+				else
+				{
+				    lastbiosvalue = *(uint32_t*)&bios[tempaddr];
+				    temp = (lastbiosvalue >> shift);
+				}
 			}
 			else
 			{
-				temp = 0x00;
+				temp = memarm.readByte((memarm.getreg(15) - 4));
 			}
 		}
 		break;
@@ -130,7 +141,14 @@ namespace gba
 		break;
 		case 0x6:
 		{
-			temp = vram[(addr & 0x1FFFF)];
+			uint32_t tempaddr = (addr & 0x1FFFF);
+			
+			if (tempaddr >= 0x18000)
+			{
+			    tempaddr &= ~0x8000;
+			}
+			
+			temp = vram[tempaddr];
 		}
 		break;
 		case 0x7:
@@ -189,17 +207,7 @@ namespace gba
 	    break;
 	    case 0xD:
 	    {
-		if (iseeprom())
-		{
-		    if (!TestBit(addr, 0))
-		    {
-			temp = readeeprom(addr);
-		    }
-		    else
-		    {
-			temp = 0;
-		    }
-		}
+	        temp = 0;
 	    }
 	    break;
 	    case 0xE:
@@ -225,7 +233,7 @@ namespace gba
 		}
 	    }
 	    break;
-	    default: temp = 0x00; break;
+	    default: temp = memarm.readByte((memarm.getreg(15) - 4)); break;
 	}
 
 	return temp;
@@ -272,7 +280,14 @@ namespace gba
 		break;
 		case 0x6:
 		{
-			vram[(addr & 0x1FFFF)] = val;
+			uint32_t tempaddr = (addr & 0x1FFFF);
+			
+			if (tempaddr >= 0x18000)
+			{
+			    tempaddr &= ~0x8000;
+			}
+		
+			vram[tempaddr] = val;
 		}
 		break;
 		case 0x7:
@@ -337,13 +352,7 @@ namespace gba
 	    break;
 	    case 0xD:
 	    {
-		if (iseeprom())
-		{
-		    if (!TestBit(addr, 0))
-		    {
-			writeeeprom(val);
-		    }
-		}
+	        return;
 	    }
 	    break;
 	    case 0xE:
@@ -390,7 +399,7 @@ namespace gba
 			}
 			else
 			{
-				temp = 0x00;
+				temp = memarm.readWord((memarm.getreg(15) - 4));
 			}
 		}
 		break;
@@ -416,7 +425,14 @@ namespace gba
 		break;
 		case 0x6:
 		{
-			temp = *(uint16_t*)&vram[(addr & 0x1FFFF)];
+			uint32_t tempaddr = (addr & 0x1FFFF);
+			
+			if (tempaddr >= 0x18000)
+			{
+			    tempaddr &= ~0x8000;
+			}
+		
+			temp = *(uint16_t*)&vram[tempaddr];
 		}
 		break;
 		case 0x7:
@@ -451,15 +467,18 @@ namespace gba
 	    break;
 	    case 0xD:
 	    {
-		temp = ((readByte(addr + 1) << 8) | (readByte(addr)));
+		if (iseeprom())
+		{
+		    temp = readeeprom(addr);
+		}
 	    }
 	    break;
 	    case 0xE:
 	    {
-		temp = ((readByte(addr + 1) << 8) | (readByte(addr)));
+		temp = ((readByte(addr + !issram()) << 8) | (readByte(addr)));
 	    }
 	    break;
-	    default: temp = 0x00; break;
+	    default: temp = memarm.readWord((memarm.getreg(15) - 4)); break;
 	}
 
 	return temp;
@@ -484,6 +503,11 @@ namespace gba
 		case 0x2:
 		{
 			*(uint16_t*)&wram256[(addr & 0x3FFFF)] = val;
+			
+			if (addr == 0x203FFF4)
+			{
+			    cout << "WRAM val: " << hex << (int)(val) << endl;    
+			}
 		}
 		break;
 		case 0x3:
@@ -504,7 +528,14 @@ namespace gba
 		break;
 		case 0x6:
 		{
-			*(uint16_t*)&vram[(addr & 0x1FFFF)] = val;
+			uint32_t tempaddr = (addr & 0x1FFFF);
+			
+			if (tempaddr >= 0x18000)
+			{
+			    tempaddr &= ~0x8000;
+			}
+		
+			*(uint16_t*)&vram[tempaddr] = val;
 		}
 		break;
 		case 0x7:
@@ -530,8 +561,10 @@ namespace gba
 	    break;
 	    case 0xD:
 	    {
-	    	writeByte(addr, (val & 0xFF));
-	    	writeByte((addr + 1), (val >> 8));
+		if (iseeprom())
+		{
+		    writeeeprom(val);
+		}
 	    }
 	    break;
 	    case 0xE:
@@ -561,11 +594,11 @@ namespace gba
 		{
 			if (addr < 0x4000)
 			{
-				temp = *(uint32_t*)&bios[addr];
+				temp = lastbiosvalue = *(uint32_t*)&bios[addr];
 			}
 			else
 			{
-				temp = 0x00;
+				temp = memarm.readLong((memarm.getreg(15) - 4));
 			}
 		}
 		break;
@@ -591,7 +624,14 @@ namespace gba
 		break;
 		case 0x6:
 		{
-			temp = *(uint32_t*)&vram[(addr & 0x1FFFF)];
+			uint32_t tempaddr = (addr & 0x1FFFF);
+			
+			if (tempaddr >= 0x18000)
+			{
+			    tempaddr &= ~0x8000;
+			}
+			
+			temp = *(uint32_t*)&vram[tempaddr];
 		}
 		break;
 		case 0x7:
@@ -626,15 +666,26 @@ namespace gba
 	    break;
 	    case 0xD:
 	    {
-		temp = ((readWord(addr + 2) << 16) | (readWord(addr)));
+		temp = 0;
 	    }
 	    break;
 	    case 0xE:
 	    {
-		temp = ((readWord(addr + 2) << 16) | (readWord(addr)));
+		temp = ((readWord(addr + (!issram() << 1)) << 16) | (readWord(addr)));
 	    }
 	    break;
-	    default: temp = 0x00; break;
+	    default: 
+	    {
+		if ((memarm.getreg(15) - dmapc) == (memarm.instmode == memarm.thumbmode ? 2 : 4))
+		{
+		    temp = dmavalue;
+		}
+		else
+		{
+		    temp = memarm.readLong((memarm.getreg(15) - 4));
+		}
+	    }
+	    break;
 	}
 
 	return temp;
@@ -679,7 +730,14 @@ namespace gba
 		break;
 		case 0x6:
 		{
-			*(uint32_t*)&vram[(addr & 0x1FFFF)] = val;
+			uint32_t tempaddr = (addr & 0x1FFFF);
+			
+			if (tempaddr >= 0x18000)
+			{
+			    tempaddr &= ~0x8000;
+			}
+			
+			*(uint32_t*)&vram[tempaddr] = val;
 		}
 		break;
 		case 0x7:
@@ -705,8 +763,7 @@ namespace gba
 	    break;
 	    case 0xD:
 	    {
-		writeWord(addr, (val & 0xFFFF));
-		writeWord((addr + 2), (val >> 16));
+		return;
 	    }
 	    break;
 	    case 0xE:
@@ -1102,145 +1159,134 @@ namespace gba
 	}
     }
 
-    uint8_t MMU::readeeprom(uint32_t addr)
+    uint16_t MMU::readeeprom(uint32_t addr)
     {
-	uint8_t temp = 0;
-
+	uint16_t temp = 0;
+	
 	if (eepromstate == 3)
 	{
 	    if (eepromcmd == 2)
 	    {
-		temp = 1;
-		eepromstate = 1;
+	        temp = 1;
+	        eepromstate = 1;
 	    }
 	    else
 	    {
-		if (eepromdelay == 0)
-		{
-		    eeprombitsread -= 1;
-		    temp = TestBit(gameeeprom[eepromaddr], eeprombits) ? 1 : 0;
-
-		    eeprombits -= 1;
-
-		    if (eeprombits < 0)
-		    {
-			eeprombits = 7;
-			eepromaddr += 1;
-		    }
-		
-		    if (eeprombitsread == 0)
-		    {
-			eepromstate = 1;
-			eeprombuffer = 0;
-			eeprombufflength = 0;
-			eeprombitsread = 64;
-			eepromdelay = 4;
-		    }
-		}
-		else
-		{
-		    eepromdelay -= 1;
-		    temp = 0;
-		}
+	    	eeprombitsread += 1;
+	    	
+	    	if (eeprombitsread <= 4)
+	    	{
+	    	    temp = 0;
+	    	}
+	    	else
+	    	{
+	    	    int eeprombit = ((7 - (eeprombitsread - 5) % 8));
+	    	    temp = TestBit(gameeeprom[eepromreadaddr], eeprombit) ? 1 : 0;
+	    	    
+	    	    if (eeprombit == 0)
+	    	    {
+	    	        eepromreadaddr += 1;
+	    	    }
+	    	}
+	    	
+	    	if (eeprombitsread == 68)
+	    	{
+	    	    eeprombitsread = 0;
+	    	    eepromstate = 1;
+	    	    eeprombuffer = 0;
+	    	    eepromlength = 0;
+	    	}
 	    }
 	}
 	else
 	{
 	    temp = 0;
 	}
-
+	
 	return temp;
     }
 
-    void MMU::writeeeprom(uint8_t value)
+    void MMU::writeeeprom(uint16_t val)
     {
+	cout << dec << (int)(TestBit(val, 0)) << endl;
+	
 	switch (eepromstate)
 	{
 	    case 1:
 	    {
-		eeprombuffer <<= 1;
-		eeprombuffer |= TestBit(value, 0);
-		eeprombufflength += 1;
-
-		if (eeprombufflength == 2)
-		{
-		    eeprombufflength = 0;
-		    eepromcmd = (eeprombuffer & 0x3);
-		    eepromstate = 2;
-		}
+	    	eeprombuffer <<= 1;
+	    	eeprombuffer |= TestBit(val, 0);
+	    	eepromlength += 1;
+	    	
+	    	if (eepromlength == 2)
+	    	{
+	    	    eepromlength = 0;
+	    	    eepromcmd = (eeprombuffer & 0x3);
+	    	    eepromstate = 2;
+	    	}
 	    }
 	    break;
 	    case 2:
 	    {
-		switch (eepromcmd)
-		{
-		    case 2:
-		    {
-			eeprombuffer <<= 1;
-			eeprombuffer |= TestBit(value, 0);
-			eeprombufflength += 1;
-
-			if (eeprombufflength == eeprombitsize)
-			{
-			    eepromwrite = ((eeprombuffer & eeprombitmask) << 3);
-			    eeprombufflength = 0;
-			    eeprombuffer = 0;
-			    eepromstate = 4;
-			}
-		    }
-		    break;
-		    case 3:
-		    {
-			eeprombuffer <<= 1;
-			eeprombuffer |= TestBit(value, 0);
-			eeprombufflength += 1;
-
-			if (eeprombufflength == (eeprombitsize + 1))
-			{
-			    eepromaddr = (((eeprombuffer >> 1) & eeprombitmask) << 3);
-			    eeprombufflength = 0;
-			    eepromstate = 3;
-			}
-		    }
-		    break;
-		    default: cout << "Unrecognized EEPROM command of " << hex << (int)(eepromcmd) << endl; exit(1); break;
-		}
+	    	switch (eepromcmd)
+	    	{
+	    	    case 2:
+	    	    {
+	    	    	eeprombuffer <<= 1;
+	    	    	eeprombuffer |= TestBit(val, 0);
+	    	    	eepromlength += 1;
+	    	    	
+	    	    	if (eepromlength == eeprombitsize)
+	    	    	{
+	    	    	    eepromwriteaddr = ((eeprombuffer & eeprombitmask) << 3);
+	    	    	    eepromlength = 0;
+	    	    	    eeprombuffer = 0;
+	    	    	    eepromstate = 4;
+	    	    	}
+	    	    }
+	    	    break;
+	    	    case 3:
+	    	    {
+	    	        eeprombuffer <<= 1;
+	    	        eeprombuffer |= TestBit(val, 0);
+	    	        eepromlength += 1;
+	    	        
+	    	        if (eepromlength == (eeprombitsize + 1))
+	    	        {
+	    	            eepromreadaddr = (((eeprombuffer >> 1) & eeprombitmask) << 3);
+	    	            eepromlength = 0;
+	    	            eepromstate = 3;
+	    	        }
+	    	    }
+	    	    break;
+	    	    default: cout << "Unrecognized command of " << bitset<2>(eepromcmd) << endl; exit(1); break;
+	    	}
 	    }
 	    break;
 	    case 4:
 	    {
-		eeprombuffer <<= 1;
-		eeprombuffer |= TestBit(value, 0);
-		eeprombufflength += 1;
-
-		if (eeprombufflength == 8)
-		{
-		    eeprombufflength = 0;
-		    gameeeprom[eepromwrite] = (eeprombuffer & 0xFF);
-		    
-		    eeprombyteswrite += 1;
-		    eepromwrite += 1;
-		    eeprombuffer = 0;
-		    
-		    if (eeprombyteswrite == 8)
-		    {
-			eeprombyteswrite = 0;
-			eepromstate = 5;
-		    }
-		}
+	    	eeprombuffer <<= 1;
+	    	eeprombuffer |= TestBit(val, 0);
+	    	eepromlength += 1;
+	    	
+	    	if (eepromlength == 8)
+	    	{
+	    	    eepromlength = 0;
+	    	    gameeeprom[eepromwriteaddr] = (eeprombuffer & 0xFF);
+	    	    
+	    	    eeprombyteswritten += 1;
+	    	    eepromwriteaddr += 1;
+	    	    eeprombuffer = 0;
+	    	    
+	    	    if (eeprombyteswritten == 8)
+	    	    {
+	    	    	eeprombyteswritten = 0;
+	    	    	eepromstate = 5;
+	    	    }
+	    	}
 	    }
 	    break;
-	    case 5:
-	    {
-		eeprombufflength += 1;
-
-		if (eeprombufflength == 1)
-		{
-		    eeprombufflength = 0;
-		    eepromstate = 3;
-		}
-	    }
-	    break;
+	    case 5: eepromstate = 3; break;
 	}
     }
 

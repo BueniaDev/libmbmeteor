@@ -45,7 +45,7 @@ namespace gba
 		
 			MMU& gpumem;
 		
-			void updatelcd();
+			void updatelcd(int cycles);
 
 			pixelfunc drawpixels;
 			
@@ -167,13 +167,13 @@ namespace gba
 			    }
 			}
 
-			RGB framebuffer[(240 * 160)];
-			uint16_t bg0buffer[240];
-			uint16_t bg1buffer[240];
-			uint16_t bg2buffer[240];
-			uint16_t bg3buffer[240];
-			uint16_t objbuffer[240];
-			int objinfobuffer[240];
+			RGB framebuffer[(240 * 160)] = {{{0, 0, 0}}};
+			uint16_t bg0buffer[240] = {{0}};
+			uint16_t bg1buffer[240] = {{0}};
+			uint16_t bg2buffer[240] = {{0}};
+			uint16_t bg3buffer[240] = {{0}};
+			uint16_t objbuffer[240] = {{0}};
+			int objinfobuffer[240] = {{0}};
 
 			RGB black = {0, 0, 0};
 
@@ -232,12 +232,6 @@ namespace gba
 			
 			void setcy(int layernum)
 			{
-			    if ((bgaff[layernum].cy == 1024) && (bgaff[layernum].y == 0))
-			    {
-				cout << hex << (int)(dispstat) << endl;
-				exit(1);
-			    }
-
 			    bgaff[layernum].cy = (bgaff[layernum].y & 0xFFFFFFF);
 
 			    if (TestBit(bgaff[layernum].y, 27))

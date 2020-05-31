@@ -23,6 +23,7 @@
 #include "gba/apu.h"
 #include "gba/input.h"
 #include "gba/timers.h"
+#include "gba/serial.h"
 #include "nds/mmu.h"
 #include "nds/cpu.h"
 #include "libmbmeteor_api.h"
@@ -44,6 +45,7 @@ namespace gba
 	    ~GBACore();
 
 	    unique_ptr<MMU> coremmu;
+	    unique_ptr<Serial> coreserial;
 	    unique_ptr<GPU> coregpu;
 	    unique_ptr<Input> coreinput;
 	    unique_ptr<Timers> coretimers;
@@ -52,6 +54,9 @@ namespace gba
 
 	    bool init();
 	    void shutdown();
+	    
+	    bool paused = false;
+	    bool ispowerenabled = false;
 
 	    bool getoptions(int argc, char* argv[]);
 	    void printusage(char* argv);

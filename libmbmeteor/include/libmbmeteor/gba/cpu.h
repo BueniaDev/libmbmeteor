@@ -49,6 +49,7 @@ namespace gba
 
 	    bool isswi = false;
 	    int clockcycles = 0;
+	    int tempcycles = 0;
 
 	    uint8_t readByte(uint32_t addr)
 	    {
@@ -86,7 +87,7 @@ namespace gba
 
 		if (val < 0x2000000)
 		{
-		    temp = 1;
+		    temp = (1 << TestBit(flags, 0));
 		}
 		else if (val < 0x2040000)
 		{
@@ -106,99 +107,166 @@ namespace gba
 		}
 		else if (val < 0x6000000)
 		{
-		    temp = (1 + TestBit(flags, 0));
+		    temp = 1;
 		}
 		else if (val < 0x7000000)
 		{
-		    temp = (1 + TestBit(flags, 0));
+		    temp = (1 << TestBit(flags, 0));
 		}
 		else if (val < 0x8000000)
 		{
-		    temp = 1;
+		    temp = (1 << TestBit(flags, 0));
 		}
 		else if (val < 0xA000000)
 		{
-		    if (TestBit(flags, 1))
+		    int ftemp = 1;
+
+		    switch ((flags & 0x3))
 		    {
-			int ftemp = 5;
-
-			int nonseq = ((mem.waitcnt >> 2) & 0x3);
-
-			switch (nonseq)
+			case 0:
 			{
-			    case 0: ftemp = 5; break;
-			    case 1: ftemp = 4; break;
-			    case 2: ftemp = 3; break;
-			    case 3: ftemp = 9; break;
+			    ftemp = (TestBit(mem.waitcnt, 4) ? 2 : 3);
 			}
-
-			temp = (ftemp << TestBit(flags, 0));
-		    }
-		    else
-		    {
-			temp = ((TestBit(mem.waitcnt, 4) ? 2 : 3) << TestBit(flags, 0));
-		    }
-		}
-		else if (val < 0xC000000)
-		{
-		    if (TestBit(flags, 1))
-		    {
-			int ftemp = 1;
-
-			int nonseq = ((mem.waitcnt >> 5) & 0x3);
-
-			switch (nonseq)
+			break;
+			case 1:
 			{
-			    case 0: ftemp = 5; break;
-			    case 1: ftemp = 4; break;
-			    case 2: ftemp = 3; break;
-			    case 3: ftemp = 9; break;
+			    ftemp = (TestBit(mem.waitcnt, 4) ? 4 : 6);
 			}
-
-			temp = (ftemp << TestBit(flags, 0));
-		    }
-		    else
-		    {
-			temp = ((TestBit(mem.waitcnt, 7) ? 2 : 5) << TestBit(flags, 0));
-		    }
-		}
-		else if (val < 0xE000000)
-		{
-		    if (TestBit(flags, 1))
-		    {
-			int ftemp = 1;
-
-			int nonseq = ((mem.waitcnt >> 8) & 0x3);
-
-			switch (nonseq)
+			break;
+			case 2:
 			{
-			    case 0: ftemp = 5; break;
-			    case 1: ftemp = 4; break;
-			    case 2: ftemp = 3; break;
-			    case 3: ftemp = 9; break;
+			    switch (((mem.waitcnt >> 2) & 0x3))
+			    {
+				case 0: ftemp = 5; break;
+				case 1: ftemp = 4; break;
+				case 2: ftemp = 3; break;
+				case 3: ftemp = 9; break;
+			    }
+			    break;
 			}
+			break;
+			case 3:
+			{
+			    int waittemp = ((mem.waitcnt >> 2) & 0x7);
 
-			temp = (ftemp << TestBit(flags, 0));
-		    }
-		    else
-		    {
-			temp = ((TestBit(mem.waitcnt, 10) ? 2 : 9) << TestBit(flags, 0));
-		    }
-		}
-		else if (val < 0xF000000)
-		{
-		    int ftemp = 5;
-		    int nonseq = (mem.waitcnt & 0x3);
-
-		    switch (nonseq)
-		    {
-			case 0: ftemp = 5; break;
-			case 1: ftemp = 4; break;
-			case 2: ftemp = 3; break;
-			case 3: ftemp = 9; break;
+			    switch (waittemp)
+			    {
+				case 0: ftemp = 8; break;
+				case 1: ftemp = 7; break;
+				case 2: ftemp = 6; break;
+				case 3: ftemp = 12; break;
+				case 4: ftemp = 7; break;
+				case 5: ftemp = 6; break;
+				case 6: ftemp = 5; break;
+				case 7: ftemp = 11; break;
+			    }
+			}
+			break;
 		    }
 
 		    temp = ftemp;
+		}
+		else if (val < 0xC000000)
+		{
+		    int ftemp = 1;
+
+		    switch ((flags & 0x3))
+		    {
+			case 0:
+			{
+			    ftemp = (TestBit(mem.waitcnt, 7) ? 2 : 5);
+			}
+			break;
+			case 1:
+			{
+			    ftemp = (TestBit(mem.waitcnt, 7) ? 4 : 10);
+			}
+			break;
+			case 2:
+			{
+			    switch (((mem.waitcnt >> 5) & 0x3))
+			    {
+				case 0: ftemp = 5; break;
+				case 1: ftemp = 4; break;
+				case 2: ftemp = 3; break;
+				case 3: ftemp = 9; break;
+			    }
+			    break;
+			}
+			break;
+			case 3:
+			{
+			    int waittemp = ((mem.waitcnt >> 5) & 0x7);
+
+			    switch (waittemp)
+			    {
+				case 0: ftemp = 10; break;
+				case 1: ftemp = 9; break;
+				case 2: ftemp = 8; break;
+				case 3: ftemp = 14; break;
+				case 4: ftemp = 7; break;
+				case 5: ftemp = 6; break;
+				case 6: ftemp = 5; break;
+				case 7: ftemp = 11; break;
+			    }
+			}
+			break;
+		    }
+
+		    temp = ftemp;
+		}
+		else if (val < 0xE000000)
+		{
+		    int ftemp = 1;
+
+		    switch ((flags & 0x3))
+		    {
+			case 0:
+			{
+			    ftemp = (TestBit(mem.waitcnt, 10) ? 2 : 9);
+			}
+			break;
+			case 1:
+			{
+			    ftemp = (TestBit(mem.waitcnt, 10) ? 4 : 18);
+			}
+			break;
+			case 2:
+			{
+			    switch (((mem.waitcnt >> 8) & 0x3))
+			    {
+				case 0: ftemp = 5; break;
+				case 1: ftemp = 4; break;
+				case 2: ftemp = 3; break;
+				case 3: ftemp = 9; break;
+			    }
+			    break;
+			}
+			break;
+			case 3:
+			{
+			    int waittemp = ((mem.waitcnt >> 8) & 0x7);
+
+			    switch (waittemp)
+			    {
+				case 0: ftemp = 14; break;
+				case 1: ftemp = 13; break;
+				case 2: ftemp = 12; break;
+				case 3: ftemp = 18; break;
+				case 4: ftemp = 7; break;
+				case 5: ftemp = 6; break;
+				case 6: ftemp = 5; break;
+				case 7: ftemp = 11; break;
+			    }
+			}
+			break;
+		    }
+
+		    temp = ftemp;
+		}
+		else if (val < 0xF000000)
+		{
+		    temp = 1;
 		}
 		else
 		{
@@ -211,7 +279,8 @@ namespace gba
 	    void update()
 	    {
 		clockcycles += 1;
-		gpu.updatelcd();
+		// tempcycles += 1;
+		gpu.updatelcd(1);
 		timer.updatetimers();
 		apu.updateapu();
 	    }
@@ -235,6 +304,18 @@ namespace gba
 	    {
 		return;
 	    }
+	    
+	    void exceptionreturncallback()
+	    {
+	    	if ((mem.memarm.getcpsr() & 0x1F) == 0x12)
+	    	{
+	    	    mem.lastbiosvalue = 0xE55EC002;
+	    	}
+	    	else if ((mem.memarm.getcpsr() & 0x1F) == 0x13)
+	    	{
+	    	    mem.lastbiosvalue = 0xE3A02004;
+	    	}
+	    }
     };
 
     class LIBMBMETEOR_API CPU
@@ -254,10 +335,12 @@ namespace gba
 
 	    int tempcycles = 0;
 
+	    bool tempbool = false;
 	    bool dump = false;
 	    bool isinterrupt = false;
 
 	    int temp = 0;
+	    uint32_t val = 0;
 
 	    CPUInterface *inter;
 
@@ -265,13 +348,18 @@ namespace gba
 	    {
 		arm->executenextinstr();
 	    }
+	    
+	    inline void interrupt()
+	    {
+	        arm->irqexception();
+	    }
 
 	    inline int runfor(int cycles)
 	    {
 		while (cycles > 0)
 		{
 		    if (mem.dmainprogress())
-		    {
+		    {   
 			mem.updatedma();
 			continue;
 		    }
@@ -287,6 +375,24 @@ namespace gba
 		    executenextinstr();
 		    cycles -= inter->clockcycles;
 		    inter->clockcycles = 0;
+		    
+		    /*
+		    if (arm->getreg(15) == 0x80018D6)
+		    {
+		        dump = true;
+		    }
+		    
+		    if (dump == true)
+		    {
+		        arm->printregs();
+		        cout << endl;
+		        
+		        if (arm->getreg(15) == 0x80018F4)
+		        {
+		            exit(1);
+		        }
+		    }
+		    */
 		}
 
 		return cycles;

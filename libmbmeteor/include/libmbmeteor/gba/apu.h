@@ -26,6 +26,61 @@ using namespace std;
 namespace gba
 {
     using apuoutput = function<void(int16_t, int16_t)>;
+    
+    struct dsoundqueue
+    {
+        int8_t data[32];
+        
+        int rdptr;
+        int wrptr;
+        int count;
+        
+        void reset()
+        {
+            rdptr = 0;
+            wrptr = 0;
+            count = 0;
+        }
+        
+        int size()
+        {
+            return count;
+        }
+        
+        bool empty()
+        {
+            return (count == 0);
+        }
+        
+        void push(int8_t val)
+        {
+            if (count < 32)
+            {
+                data[wrptr] = val;
+                wrptr = ((wrptr + 1) % 32);
+                count += 1;
+            }
+        }
+        
+        int8_t front()
+        {
+            return data[rdptr];
+        }
+        
+        void pop()
+        {
+            if (count > 0)
+            {
+                rdptr = ((rdptr + 1) % 32);
+                count -= 1;
+            }
+        }
+        
+        dsoundqueue()
+        {
+            reset();
+        }
+    };
 
     class LIBMBMETEOR_API APU
     {
@@ -130,6 +185,92 @@ namespace gba
 	    void s2envelopetick(int frameseq);
 	    void s2timertick();
 	    float gets2outputvol();
+	    
+	    int wavesweep = 0;
+	    int wavesoundlength = 0;
+	    int wavelengthcounter = 0;
+	    int waveenvelope = 0;
+	    int wavevolume = 0;
+	    uint8_t wavefreqlo = 0;
+	    uint8_t wavefreqhi = 0;
+	    int waveperiodtimer = 0;
+	    bool waveenabled = false;
+	    int waveramlengthmask = 0;
+	    int wavepos = 0;
+	    bool wavechannelenabled = false;
+	    uint8_t wavecurrentsample = 0;
+	    uint8_t wavelastplayedsample = 0;
+	    array<uint8_t, 0x20> waveram = {{0x00}};
+	    bool prevwavelengthdec = false;
+	    
+	    void waveupdate(int frameseq);
+	    void wavetimertick();
+	    void wavelengthcountertick(int frameseq);
+	    float getwaveoutputvol();
+	    
+	    inline bool waveenabledleft()
+	    {
+		return (waveenabled && (TestBit(soundselect, 6)));
+	    }
+
+	    inline bool waveenabledright()
+	    {
+		return (waveenabled && (TestBit(soundselect, 2)));
+	    }
+		
+	    inline void reloadwavelengthcounter()
+	    {
+		wavelengthcounter = (256 - wavesoundlength);
+		wavesoundlength = 0;	
+	    }
+
+	    inline void wavereloadperiod()
+	    {
+		int frequency = (wavefreqlo | ((wavefreqhi & 0x07) << 8));
+		waveperiodtimer = (2048 - frequency);
+	    }
+
+	    inline void wavewritereset(uint8_t value)
+	    {
+		bool lengthwasenable = TestBit(wavefreqhi, 6);
+		wavefreqhi = (value & 0xC7);
+
+		if (apulengthlow() && !lengthwasenable && TestBit(wavefreqhi, 6) && wavelengthcounter > 0)
+		{
+		    wavelengthcounter -= 1;
+
+		    if (wavelengthcounter == 0)
+		    {
+			waveenabled = false;
+		    }
+		}
+
+		if (TestBit(wavefreqhi, 7))
+		{
+		    waveresetchannel();
+		}
+	    }
+
+	    inline void waveresetchannel()
+	    {
+		waveenabled = true;
+		wavereloadperiod();
+		wavefreqhi &= 0x7F;
+
+		if (wavelengthcounter == 0)
+		{
+		    wavelengthcounter = 256;
+
+		    if (apulengthlow() && TestBit(wavefreqhi, 6))
+		    {
+			wavelengthcounter -= 1;
+		    }
+		}
+
+		wavepos = 0;
+		waveenabled = TestBit(wavesweep, 7);
+		wavecurrentsample = wavelastplayedsample;
+	    }
 
 	    int noiselength = 0;
 	    int noiselengthcounter = 0;
@@ -457,14 +598,9 @@ namespace gba
 
 	    bool dma1fiforec = false;
 
-	    void consumesamplefifoa(int timer)
+	    inline void consumesamplefifoa(int timer)
 	    {
 		if (!masterenable)
-		{
-		    return;
-		}
-
-		if ((!dmasoundaright) && (!dmasoundaleft))
 		{
 		    return;
 		}
@@ -516,7 +652,7 @@ namespace gba
 		}
 	    }
 
-	    void consumesamplefifob(int timer)
+	    inline void consumesamplefifob(int timer)
 	    {
 		if (!masterenable)
 		{
@@ -567,7 +703,7 @@ namespace gba
 		    {
 			apumem.dma1req = true;
 			apumem.dma2req = true;
-			// apumem.signalfifo(1);
+			apumem.signalfifo(1);
 			apumem.signalfifo(2);
 		    }
 
@@ -600,12 +736,18 @@ namespace gba
 
 	    uint16_t soundbias = 0x200;
 
-	    queue<int8_t> fifoabuffer;
-	    queue<int8_t> fifobbuffer;
+	    dsoundqueue fifoabuffer;
+	    dsoundqueue fifobbuffer;
+	    // queue<int8_t> fifoabuffer;
+	    // queue<int8_t> fifobbuffer;
 	    queue<pair<int8_t, uint64_t>> fifoaplayback;
+	    
+	    uint8_t soundratio = 0;
+	    uint8_t dsoundval = 0;
 
 	    void writeratio(uint8_t val)
 	    {
+	        soundratio = (val & 0xF);
 		switch ((val & 0x3))
 		{
 		    case 0: psgvolume = 1; break;
@@ -620,6 +762,8 @@ namespace gba
 
 	    void writedsound(uint8_t val)
 	    {
+	    	cout << hex << (int)(val & 0x77) << endl;
+	    	dsoundval = (val & 0x77);
 		dmasoundaright = TestBit(val, 0);
 		dmasoundaleft = TestBit(val, 1);
 		dmasoundatimer = TestBit(val, 2);
@@ -630,16 +774,14 @@ namespace gba
 		
 		if (!fifoabuffer.empty() && TestBit(val, 3))
 		{
-		    cout << "Emptying queue..." << endl;
-		    queue<int8_t> empty;
-		    fifoabuffer = empty;
+		    cout << "Emptying queue A..." << endl;
+		    fifoabuffer.reset();
 		}
 
 		if (!fifobbuffer.empty() && TestBit(val, 7))
 		{
-		    cout << "Emptying queue..." << endl;
-		    queue<int8_t> empty;
-		    fifobbuffer = empty;
+		    cout << "Emptying queue B..." << endl;
+		    fifobbuffer.reset();
 		}
 	    }
 
@@ -653,8 +795,8 @@ namespace gba
 		{
 		    cout << "Disabling all sound..." << endl;
 		    queue<int8_t> empty;
-		    fifoabuffer = empty;
-		    fifobbuffer = empty;
+		    fifoabuffer.reset();
+		    fifobbuffer.reset();
 		    // exit(1);
 		}
 	    }
@@ -685,12 +827,12 @@ namespace gba
 		}
 	    }
 
-	    int getsampleinterval()
+	    inline int getsampleinterval()
 	    {
 		return (512 >> (soundbias >> 14));
 	    }
 
-	    void clampaudio(int16_t& sample, int min, int max)
+	    inline void clampaudio(int16_t& sample, int min, int max)
 	    {
 		if (sample < min)
 		{

@@ -102,6 +102,11 @@ namespace nds
 	    {
 		mem.writecp15(id, val);
 	    }
+	    
+	    void exceptionreturncallback()
+	    {
+		return;
+	    }
     };
 
     class LIBMBMETEOR_API CPU7Interface : public BeeARMInterface
@@ -172,6 +177,11 @@ namespace nds
 	    }
 
 	    void writecoprocessor(uint16_t id, uint32_t val)
+	    {
+		return;
+	    }
+	    
+	    void exceptionreturncallback()
 	    {
 		return;
 	    }

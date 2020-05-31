@@ -89,5 +89,10 @@ namespace gba
     void Input::keyreleased(Button button)
     {
 	keyinput = BitSet(keyinput, button);
+	
+	if (button == Button::A)
+	{
+	    dump = true;
+	}
     }
 };

@@ -151,7 +151,6 @@ namespace gba
 
 		void writecontrol(array<uint8_t, 7> &val)
 		{
-		    cout << hex << (int)(val[0]) << endl;
 		    control = val[0];
 		}
 
@@ -261,6 +260,8 @@ namespace gba
 		    // cout << "Unrecognized write to " << hex << (int)(addr) << endl;
 		    return;
 		}
+		
+		uint32_t lastbiosvalue = 0;
 
 		bool iseeprom()
 		{
@@ -295,21 +296,19 @@ namespace gba
 	    uint8_t readinterrupts(uint32_t addr);
 	    void writeinterrupts(uint32_t addr, uint8_t val);
 
-	    uint8_t readeeprom(uint32_t addr);
-	    void writeeeprom(uint8_t value);
-
-	    int eeprombuffer = 0;
-	    int eeprombufflength = 0;
-	    int eepromcmd = 0;
-	    int eepromaddr = 0;
-	    int eepromwrite = 0;
+	    uint16_t readeeprom(uint32_t addr);
+	    void writeeeprom(uint16_t val);
+	    
 	    int eepromstate = 1;
-	    int eepromdelay = 4;
-	    int eeprombitsread = 64;
-	    int eeprombyteswrite = 0;
-	    int eeprombits = 7;
+	    int eeprombuffer = 0;
+	    int eepromlength = 0;
+	    int eepromcmd = 0;
 	    int eeprombitsize = 6;
+	    int eepromreadaddr = 0;
+	    int eepromwriteaddr = 0;
 	    int eeprombitmask = 0x3F;
+	    int eeprombitsread = 0;
+	    int eeprombyteswritten = 0;
 	    bool eepromlock = false;
 
 	    uint8_t readflash128k(uint32_t addr);
@@ -399,6 +398,9 @@ namespace gba
 	    DmaState dma1state = DmaState::Inactive;
 	    DmaState dma2state = DmaState::Inactive;
 	    DmaState dma3state = DmaState::Inactive;
+	    
+	    uint32_t dmavalue = 0;
+	    uint32_t dmapc = 0;
 
 	    void decdmaunits(int num)
 	    {
@@ -738,23 +740,39 @@ namespace gba
 		    }
 		}
 	    }
+	    
+	    void setupdmafifo()
+	    {
+	    	if ((dma1dst & 0xF0) != 0xA0)
+	    	{
+	    	    dma1dst = TestBit(dma1dst, 2) ? 0x40000A4 : 0x40000A0;
+	    	}
+	    	
+	    	if ((dma2dst & 0xF0) != 0xA0)
+	    	{
+	    	    dma2dst = TestBit(dma2dst, 2) ? 0x40000A4 : 0x40000A0;
+	    	}
+	    }
 
 	    void setupdma(int num)
 	    {
 		aligndma(num);
 		resetdmalength(num);
-
+		
 		if ((num == 3) && (getdmadst(num) >> 24) == 0xD)
 		{
+		    cout << "EEPROM" << endl;
 		    if (((getdmaunits(num) == 17) || (getdmaunits(num) == 81)) && !eepromlock)
 		    {
-			eeprombitsize = 14;
-			eeprombitmask = 0x3FF;
-			gameeeprom.clear();
-			gameeeprom.resize(0x2000, 0);
+		    	eeprombitsize = 14;
+		    	eeprombitmask = 0x3FF;
+		    	gameeeprom.clear();
+		    	gameeeprom.resize(0x2000, 0);
 			eepromlock = true;
 		    }
 		}
+		
+		dmapc = memarm.getreg(15);
 
 		int starttiming = ((getdmacontrol(num) >> 12) & 0x3);
 
@@ -772,8 +790,9 @@ namespace gba
 			    {
 				setdmastate(1, DmaState::Paused);
 				dma1unitstocopy = 4;
-				dma1src = dma1fifosrc;
+				dma1src = dma1fifosrc;	
 				dma1fifo = true;
+				setupdmafifo();
 			    }
 			    break;
 			    case 2:
@@ -782,6 +801,7 @@ namespace gba
 				dma2unitstocopy = 4;
 				dma2src = dma2fifosrc;
 				dma2fifo = true;
+				setupdmafifo();
 			    }
 			    break;
 			    case 3: cout << "DMA3 Video Capture" << endl; break;
@@ -815,6 +835,8 @@ namespace gba
 
 		    if (getdmaunits(num) == 0)
 		    {
+		    	dmapc = memarm.getreg(15);
+
 			if ((num == 2) && (dma2fifo == true) && (dma2req == true))
 			{
 			    setdmastate(num, DmaState::Paused);
@@ -875,7 +897,8 @@ namespace gba
 	    {
 		if ((num == 2) && (dma2fifo == true) && (dma2req == true))
 		{
-		    writeLong(getdmadst(num), readLong(getdmasrc(num)));
+		    dmavalue = readLong(getdmasrc(num));
+		    writeLong(getdmadst(num), dmavalue);
 		    dma2src += 4;
 		    decdmaunits(num);
 		    return;
@@ -883,7 +906,8 @@ namespace gba
 
 		if ((num == 1) && (dma1fifo == true) && (dma1req == true))
 		{
-		    writeLong(getdmadst(num), readLong(getdmasrc(num)));
+		    dmavalue = readLong(getdmasrc(num));
+		    writeLong(getdmadst(num), dmavalue);
 		    dma1src += 4;
 		    decdmaunits(num);
 		    return;
@@ -894,8 +918,9 @@ namespace gba
 		    int srccontrol = ((getdmacontrol(num) >> 7) & 0x3);
 		    int dstcontrol = ((getdmacontrol(num) >> 5) & 0x3);
 
-		    writeLong(getdmadst(num), readLong(getdmasrc(num)));
-
+		    dmavalue = readLong(getdmasrc(num));
+		    writeLong(getdmadst(num), dmavalue);
+		    
 		    incdma(num, dstcontrol, true);
 		    incdma(num, srccontrol, false);
 		}
@@ -904,7 +929,8 @@ namespace gba
 		    int srccontrol = ((getdmacontrol(num) >> 7) & 0x3);
 		    int dstcontrol = ((getdmacontrol(num) >> 5) & 0x3);
 
-		    writeWord(getdmadst(num), readWord(getdmasrc(num)));
+		    dmavalue = readWord(getdmasrc(num));
+		    writeWord(getdmadst(num), dmavalue);
 
 		    incdma(num, dstcontrol, true);
 		    incdma(num, srccontrol, false);

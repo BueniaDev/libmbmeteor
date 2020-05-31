@@ -45,6 +45,14 @@ namespace nds
 	    vector<uint8_t> bios9;
 	    vector<uint8_t> mainmem9;
 	    vector<uint8_t> mainmem7;
+	    
+	    array<uint8_t, 0x8000> swram;
+	    
+	    uint8_t *swram_ptr9 = NULL;
+	    uint32_t swram_mask9 = 0;
+	    
+	    uint8_t *swram_ptr7 = NULL;
+	    uint32_t swram_mask7 = 0;
 
 	    vector<uint8_t> wram7;
 
@@ -113,6 +121,49 @@ namespace nds
 
 	    uint32_t readcp15(uint16_t id);
 	    void writecp15(uint16_t id, uint32_t val);
+	    
+	    uint8_t wramcnt = 0;
+	    
+	    void mapsharedwram(uint8_t val)
+	    {
+	    	wramcnt = val;
+	    	
+	    	switch ((wramcnt & 0x3))
+	    	{
+	    	    case 0:
+	    	    {
+	    		swram_ptr9 = &swram[0];
+	    		swram_mask9 = 0x7FFF;
+	    		swram_ptr7 = NULL;
+	    		swram_mask7 = 0;
+	    	    }
+	    	    break;
+	    	    case 1:
+	    	    {
+	    		swram_ptr9 = &swram[0x4000];
+	    		swram_mask9 = 0x3FFF;
+	    		swram_ptr7 = &swram[0];
+	    		swram_mask7 = 0x3FFF;
+	    	    }
+	    	    break;
+	    	    case 2:
+	    	    {
+	    		swram_ptr9 = &swram[0];
+	    		swram_mask9 = 0x3FFF;
+	    		swram_ptr7 = &swram[0x4000];
+	    		swram_mask7 = 0x3FFF;
+	    	    }
+	    	    break;
+	    	    case 3:
+	    	    {
+	    		swram_ptr9 = NULL;
+	    		swram_mask9 = 0;
+	    		swram_ptr7 = &swram[0];
+	    		swram_mask7 = 0x7FFF;
+	    	    }
+	    	    break;
+	    	}
+	    }
 
 	    uint32_t cp15ctrl = 0x78;
 
@@ -272,11 +323,6 @@ namespace nds
 			    firmwareaddr <<= 8;
 			    firmwareaddr |= val;
 			    firmwaredata = 0;
-
-			    if (firmwaredatapos == 3)
-			    {
-				cout << "Firmware SPI read from " << hex << (int)(firmwareaddr) << endl;
-			    }
 			}
 			else
 			{

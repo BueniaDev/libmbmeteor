@@ -101,6 +101,7 @@ namespace gba
 	{
 	    return 0;
 	}
+	
 
 	int newticks = 0;
 
@@ -121,7 +122,7 @@ namespace gba
 	    return 0;
 	}
 
-	int ticksuntiloverflow = (0x10000 - timers[timer].counter);
+	int ticksuntiloverflow = timers[timer].getoverflowcount();
 
 	if (newticks < ticksuntiloverflow)
 	{
@@ -131,8 +132,8 @@ namespace gba
 
 	newticks -= ticksuntiloverflow;
 
-	ticksuntiloverflow = (0x10000 - timers[timer].reload);
-	timers[timer].counter = timers[timer].reload + newticks % ticksuntiloverflow;
+	ticksuntiloverflow = timers[timer].getoverflowreload();
+	timers[timer].counter = timers[timer].reload + (newticks & (ticksuntiloverflow - 1));
 
 	if (TestBit(timers[timer].control, 6))
 	{

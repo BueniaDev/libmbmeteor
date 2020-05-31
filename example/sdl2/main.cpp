@@ -1,5 +1,6 @@
 #include <libmbmeteor/libmbmeteor.h>
 #include <SDL2/SDL.h>
+#include "termcolor.h"
 #include <iostream>
 #include <sstream>
 #include <ctime>
@@ -10,6 +11,7 @@ using namespace std;
 using namespace std::placeholders;
 
 GBACore core;
+PowerAntenna power;
 
 SDL_Window *window = NULL;
 SDL_Renderer *render = NULL;
@@ -21,6 +23,38 @@ int scale = 2;
 
 int fpscount = 0;
 Uint32 fpstime = 0;
+
+class TermcolorInterface : public PowerAntennaInterface
+{
+    public:
+    	TermcolorInterface()
+    	{
+    	
+    	}
+    	
+    	~TermcolorInterface()
+    	{
+    	
+    	}
+    	
+    	void ledoff()
+    	{
+	    cout << beeterm::white << "LED is off..." << endl;
+	    cout << beeterm::reset << endl;
+    	}
+    	
+    	void ledonstrong()
+    	{
+	    cout << beeterm::blue << "LED is emitting strong light..." << endl;
+	    cout << beeterm::reset << endl;
+    	}
+    	
+    	void ledonweak()
+    	{
+    	    cout << beeterm::dark << beeterm::blue << "LED is emitting weak light..." << endl;
+    	    cout << beeterm::reset << endl;
+    	}
+};
 
 void screenshot()
 {
@@ -98,6 +132,7 @@ void processinput(SDL_Event event)
 	    case SDLK_q: screenshot(); break;
 	    case SDLK_EQUALS: core.increasesolar(); break;
 	    case SDLK_MINUS: core.decreasesolar(); break;
+	    case SDLK_p: core.paused = !core.paused; break;
 	}
     }
     else if (event.type == SDL_KEYUP)
@@ -164,6 +199,13 @@ int main(int argc, char* argv[])
     {
 	return 1;
     }
+    
+    if (core.ispowerenabled)
+    {	
+    	TermcolorInterface inter;
+    	power.setinterface(&inter);
+	core.coreserial->setwritecallback(bind(&PowerAntenna::powerwrite, &power, _1, _2));
+    }
 
     if (!core.init())
     {
@@ -191,8 +233,13 @@ int main(int argc, char* argv[])
 		quit = true;
 	    }
 	}
+	
+	SDL_PauseAudio(core.paused);
 
-	core.runcore();
+	if (!core.paused)
+	{
+	    core.runcore();
+	}
 
 	framecurrenttime = SDL_GetTicks();
 

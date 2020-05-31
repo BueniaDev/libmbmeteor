@@ -23,6 +23,7 @@ namespace gba
     GBACore::GBACore()
     {
 	coremmu = make_unique<MMU>();
+	coreserial = make_unique<Serial>(*coremmu);
 	coregpu = make_unique<GPU>(*coremmu);
 	coreinput = make_unique<Input>(*coremmu);
 	coreapu = make_unique<APU>(*coremmu);
@@ -100,6 +101,15 @@ namespace gba
 		printusage(argv[0]);
 		return false;
 	    }
+	   
+	    if ((strcmp(argv[i], "--power") == 0))
+	    {
+		ispowerenabled = true;
+	    }
+	    else
+	    {
+	        ispowerenabled = false;
+	    }
 	}
 
 	romname = argv[1];
@@ -161,6 +171,6 @@ namespace gba
 
     void GBACore::runcore()
     {
-	overspentcycles = corecpu->runfor(280897 + overspentcycles);
+	overspentcycles = corecpu->runfor(280930 + overspentcycles);
     }
 };

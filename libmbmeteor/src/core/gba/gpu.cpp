@@ -92,7 +92,7 @@ namespace gba
 		case 0x1: dispcnt = ((value << 8) | (dispcnt & 0xFF)); break;
 		case 0x2: return; break;
 		case 0x3: return; break;
-		case 0x4: dispstat = ((dispstat & 0xFF00) | (value & 0xF8)); break; // The bottom 3 bits of DISPSTAT are read-only
+		case 0x4: dispstat = ((dispstat & 0xFF07) | (value & 0xF8)); break; // The bottom 3 bits of DISPSTAT are read-only
 		case 0x5: dispstat = ((value << 8) | (dispstat & 0xFF)); break;
 		case 0x6: return; break; // VCount should not be written to
 		case 0x7: return; break; // VCount should not be written to
@@ -176,9 +176,9 @@ namespace gba
 	    }
 	}
 	
-	void GPU::updatelcd()
+	void GPU::updatelcd(int cycles)
 	{
-	    scanlinecounter += 1;
+	    scanlinecounter += cycles;
 	    updatevcount();
 	}
 	
@@ -188,7 +188,7 @@ namespace gba
 	    {
 		case Phase::Scanline:
 		{
-		    if (scanlinecounter == 1006)
+		    if (scanlinecounter >= 1006)
 		    {
 			phase = Phase::HBlank;
 			hblank(true);
@@ -198,7 +198,7 @@ namespace gba
 		break;
 		case Phase::HBlank:
 		{
-		    if (scanlinecounter == 1232)
+		    if (scanlinecounter >= 1232)
 		    {
 			scanlinecounter = 0;
 			hblank(false);
@@ -224,7 +224,7 @@ namespace gba
 		break;
 		case Phase::VBlankScanline:
 		{
-		    if (scanlinecounter == 1006)
+		    if (scanlinecounter >= 1006)
 		    {
 			phase = Phase::VBlankHBlank;
 			hblank(true);
@@ -233,7 +233,7 @@ namespace gba
 		break;
 		case Phase::VBlankHBlank:
 		{
-		    if (scanlinecounter == 1232)
+		    if (scanlinecounter >= 1232)
 		    {
 			scanlinecounter = 0;
 
@@ -486,8 +486,8 @@ namespace gba
 				{
 					int tmpx = samplex - (horizontalsize >> 1);
 					int tmpy = sampley - (verticalsize >> 1);
-					samplex = pa * tmpx + pb * tmpy >> 8;
-					sampley = pc * tmpx + pd * tmpy >> 8;
+					samplex = ((pa * tmpx + pb * tmpy) >> 8);
+					sampley = ((pc * tmpx + pd * tmpy) >> 8);
 					samplex += samplehorizsize >> 1;
 					sampley += samplevertsize >> 1;
 					
@@ -526,18 +526,18 @@ namespace gba
 				
 				if (TestBit(dispcnt, 6))
 				{
-					tileaddr += mapx + (mapy << mapyshift) << singlepal;
+					tileaddr += ((mapx + (mapy << mapyshift)) << singlepal);
 				}
 				else
 				{
-					tileaddr += (mapx << singlepal) + (mapy << 5);
+					tileaddr += ((mapx << singlepal) + (mapy << 5));
 				}
 				
 				tileaddr <<= 5;	
 
 				tileaddr += tilebase;
 				
-				tileaddr += tilex + (tiley << 3) >> (1 - singlepal);
+				tileaddr += ((tilex + (tiley << 3)) >> (1 - singlepal));
 				
 				int paletteaddr = 0;
 
@@ -812,7 +812,7 @@ namespace gba
 		int tilecol = (xpos >> 3);
 		int tcol = (xpos & 7);
 
-		int mapaddr = map + (tilerow + tilecol << 1);
+		int mapaddr = (map + ((tilerow + tilecol) << 1));
 
 		uint16_t tile = readvram16(mapaddr);
 
@@ -821,7 +821,7 @@ namespace gba
 		int samplecol = TestBit(tile, 10) ? (~tcol & 7) : tcol;
 		int sampleline = TestBit(tile, 11) ? (~tline & 7) : tline;
 
-		int tileaddr = bgtilebase + (tilenum << tilesizeshift) + ((sampleline << 3) + samplecol >> tile4bit);
+		int tileaddr = (bgtilebase + (tilenum << tilesizeshift) + (((sampleline << 3) + samplecol) >> tile4bit));
 
 		uint16_t paletteaddr = 0;
 
@@ -890,8 +890,8 @@ namespace gba
 	
 	for (int i = 0; i < 240; i++)
 	{	
-		int32_t xpos = refx + pa * i >> 8;
-		int32_t ypos = refy + pc * i >> 8;
+		int32_t xpos = ((refx + pa * i) >> 8);
+		int32_t ypos = ((refy + pc * i) >> 8);
 		
 		if ((xpos < 0) || (xpos >= bgsize) || (ypos < 0) || (ypos >= bgsize))
 		{

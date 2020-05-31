@@ -37,6 +37,13 @@ namespace gba
 
     uint8_t APU::readapu(uint32_t addr)
     {
+    	if ((addr >= 0x4000090) && (addr < 0x40000A0))
+    	{
+	    int playingbankoffs = (32 - (((wavesweep & 0x40) >> 6) * 32));
+    	    uint32_t waveramaddr = ((addr - 0x4000090) + playingbankoffs);
+    	    return waveram[waveramaddr];
+    	}
+    	
 	uint8_t temp = 0;
 
 	switch ((addr & 0xFF))
@@ -45,15 +52,23 @@ namespace gba
 	    case 0x62: temp = s1length; break;
 	    case 0x63: temp = s1envelope; break;
 	    case 0x65: temp = (s1freqhi & 0x40); break;
+	    case 0x68: temp = s2length; break;
+	    case 0x69: temp = s2envelope; break;
+	    case 0x6D: temp = (s2freqhi & 0x40); break;
+	    case 0x70: temp = wavesweep; break;
+	    case 0x73: temp = waveenvelope; break;
+	    case 0x75: temp = (wavefreqhi & 0x40); break;
 	    case 0x78: temp = noiselength; break;
 	    case 0x79: temp = noiseenvelope; break;
 	    case 0x7C: temp = noisefreqlo; break;
 	    case 0x7D: temp = (noisefreqhi & 0x40); break;
 	    case 0x80: temp = mastervolume; break;
 	    case 0x81: temp = soundselect; break;
+	    case 0x82: temp = soundratio; break;
+	    case 0x83: temp = dsoundval; break;
 	    case 0x88: temp = (soundbias & 0xFF); break;
 	    case 0x89: temp = (soundbias >> 8); break;
-	    default: temp = 0xFF; break;
+	    default: cout << "Unrecognized APU read of " << hex << (int)(addr & 0xFF) << endl; temp = 0xFF; break;
 	}
 
 	return temp;
@@ -61,6 +76,14 @@ namespace gba
 
     void APU::writeapu(uint32_t addr, uint8_t val)
     {
+    	if ((addr >= 0x4000090) && (addr < 0x40000A0))
+    	{
+	    int playingbankoffs = (32 - (((wavesweep & 0x40) >> 6) * 32));
+    	    uint32_t waveramaddr = ((addr - 0x4000090) + playingbankoffs);
+    	    waveram[waveramaddr] = val;
+    	    return;
+    	}
+    
 	switch ((addr & 0xFF))
 	{
 	    case 0x60: writes1sweep(val); break;
@@ -102,6 +125,33 @@ namespace gba
 	    break;
 	    case 0x6C: s2freqlo = val; break;
 	    case 0x6D: s2writereset(val); break;
+	    case 0x70:
+	    {
+		wavesweep = (val & 0xE0);
+
+		if (!TestBit(wavesweep, 7))
+		{
+		    waveenabled = false;
+		}
+
+		waveramlengthmask = TestBit(wavesweep, 5) ? 0x3F : 0x1F;
+	    }
+	    break;
+	    case 0x72:
+	    {
+		wavesoundlength = val;
+		reloadwavelengthcounter();
+	    }
+	    break;
+	    case 0x73:
+	    {
+		waveenvelope = (val & 0xE0);
+		int wavevolshift = ((waveenvelope & 0x60) >> 5);
+		wavevolume = (wavevolshift) ? (wavevolshift - 1) : 4;
+	    }
+	    break;
+	    case 0x74: wavefreqlo = val; break;
+	    case 0x75: wavewritereset(val); break;
 	    case 0x78:
 	    {
 		noiselength = (val & 0x3F);
@@ -131,7 +181,7 @@ namespace gba
 	    case 0xA5: writefifob(1, val); break;
 	    case 0xA6: writefifob(2, val); break;
 	    case 0xA7: writefifob(3, val); break;
-	    default: break;
+	    default: cout << "Unrecognized APU write" << endl; break;
 	}
     }
 
@@ -343,6 +393,76 @@ namespace gba
 
 	return ((float)(outputvol) / 100.f);
     }
+    
+    void APU::wavetimertick()
+    {
+	if (waveperiodtimer == 0)
+	{
+	    wavelastplayedsample = wavecurrentsample;
+	    wavepos = ((wavepos + 1) & waveramlengthmask);
+	
+	    int playingbankoffs = (((wavesweep & 0x40) >> 6) * 32);
+
+	    int sampleindex = ((wavepos + playingbankoffs) & 0x3F);
+	    uint8_t samplebyte = waveram[sampleindex >> 1];
+
+	    wavecurrentsample = (TestBit(sampleindex, 0) ? (samplebyte & 0x0F) : (samplebyte >> 4));
+	    wavereloadperiod();
+	}
+	else
+	{
+	    waveperiodtimer -= 1;
+	}
+    }
+
+    void APU::wavelengthcountertick(int frameseq)
+    {
+	bool lengthcounterdec = TestBit(frameseq, 0);
+
+	if (TestBit(wavefreqhi, 6) && wavelengthcounter > 0)
+	{
+	    if (!lengthcounterdec && prevwavelengthdec)
+	    {
+		wavelengthcounter -= 1;
+
+		if (wavelengthcounter == 0)
+		{
+		    waveenabled = false;
+		}
+	    }
+	}
+
+	prevwavelengthdec = lengthcounterdec;
+    }
+	
+    void APU::waveupdate(int frameseq)
+    {
+	wavetimertick();
+	wavelengthcountertick(frameseq);
+    }
+	
+    float APU::getwaveoutputvol()
+    {
+	int outputvol = 0;
+	if (waveenabled)
+	{
+	    if (TestBit(waveenvelope, 7))
+	    {
+		outputvol = (wavecurrentsample) - (wavecurrentsample >> 2);
+	    }
+	    else
+	    {
+		outputvol = (wavecurrentsample >> wavevolume);
+	    }
+	}
+	else
+	{
+	    outputvol = 0;
+	}
+
+	return ((float)(outputvol) / 100.f);
+    }
+
 
     void APU::noiselengthcountertick(int frameseq)
     {
@@ -456,22 +576,24 @@ namespace gba
 
 	if (apuclock == 8)
 	{
-	    frametimer += 1;
 	    apuclock = 0;
+	    frametimer += 1;
 	    s1update(getframesequencer());
 	    s2update(getframesequencer());
+	    waveupdate(getframesequencer());
 	    noiseupdate(getframesequencer());
 	}
 
 	nearestresample();
     }
 
-    void APU::mixaudio()
+    inline void APU::mixaudio()
     {
 	static constexpr float ampl = 8000;
 
 	auto sound1 = gets1outputvol();
 	auto sound2 = gets2outputvol();
+	auto sound3 = getwaveoutputvol();
 	auto sound4 = getnoiseoutputvol();
 
         float leftsample = 0;
@@ -485,6 +607,11 @@ namespace gba
 	if (s2enabledleft())
         {
 	    leftsample += sound2;
+        }
+        
+        if (waveenabledleft())
+        {
+	    leftsample += sound3;
         }
 
 	if (noiseenabledleft())
@@ -500,6 +627,11 @@ namespace gba
 	if (s2enabledright())
         {
 	    rightsample += sound2;
+        }
+        
+        if (waveenabledright())
+        {
+	    rightsample += sound3;
         }
 
 	if (noiseenabledright())
@@ -551,6 +683,7 @@ namespace gba
 	tempsample -= 0x200;
 
 	float fsample = ((float)tempsample / 0x200);
+	
 	finalsample[0] = (int16_t)(fsample * 30000);
 
 	tempsample = sample[1];

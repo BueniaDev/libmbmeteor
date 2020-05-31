@@ -39,10 +39,20 @@ namespace gba
 
 	    struct Timer
 	    {
-		uint8_t control;
-		uint16_t counter;
-		uint16_t reload;
+		uint8_t control = 0;
+		uint16_t counter = 0;
+		uint16_t reload = 0;
 		int cycles = 0;
+
+		inline int getoverflowcount()
+		{
+		    return (0x10000 - counter);
+		}
+
+		inline int getoverflowreload()
+		{
+		    return (0x10000 - reload);
+		}
 
 		uint8_t read(int addr)
 		{

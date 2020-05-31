@@ -50,6 +50,8 @@ namespace nds
 	mainmem9.resize(0x1000000, 0);
 	mainmem7.resize(0x1000000, 0);
 	wram7.resize(0x800000, 0);
+	
+	mapsharedwram(0);
     }
 
     NDSMMU::~NDSMMU()
@@ -76,9 +78,21 @@ namespace nds
 		temp = mainmem9[(addr & 0xFFFFFF)];
 	    }
 	    break;
+	    case 0x03:
+	    {
+	    	if (swram_ptr7 != NULL)
+	    	{
+	    	    temp = *(uint8_t*)&swram_ptr9[(addr & swram_mask9)];
+	    	}
+	   	else
+	    	{
+	    	    temp = 0;
+	    	}
+	    }
+	    break;
 	    case 0x04:
 	    {
-		cout << "ARM9 I/O read, register of " << hex << (int)(addr & 0xFFFFFF) << endl;
+		// cout << "ARM9 I/O read, register of " << hex << (int)(addr & 0xFFFFFF) << endl;
 		if (memoryreadhandlers9[(addr & 0xFFFFFF)])
 		{
 		    temp = memoryreadhandlers9[(addr & 0xFFFFFF)](addr);
@@ -109,9 +123,21 @@ namespace nds
 	switch (addrtemp)
 	{
 	    case 0x02: mainmem9[(addr & 0xFFFFFF)] = val; break;
+	    case 0x03:
+	    {
+	    	if (swram_ptr9 != NULL)
+	    	{
+	    	    *(uint8_t*)&swram_ptr9[(addr & swram_mask9)] = val;
+	    	}
+	    	else
+	    	{
+	    	    return;
+	    	}
+	    }
+	    break;
 	    case 0x04:
 	    {
-		cout << "ARM9 I/O write, register of " << hex << (int)(addr & 0xFFFFFF) << endl;
+		// cout << "ARM9 I/O write, register of " << hex << (int)(addr & 0xFFFFFF) << endl;
 
 		if (memorywritehandlers9[(addr & 0xFFFFFF)])
 		{
@@ -160,7 +186,14 @@ namespace nds
 	    {
 		if ((addr & 0xFFFFFF) < 0x800000)
 		{
-		    temp = 0x00;
+		    if (swram_ptr7 != NULL)
+	    	    {
+	    		temp = *(uint8_t*)&swram_ptr7[(addr & swram_mask7)];
+	    	    }
+	   	    else
+	    	    {
+	    		temp = 0;
+	    	    }
 		}
 		else
 		{
@@ -170,7 +203,7 @@ namespace nds
 	    break;
 	    case 0x04:
 	    {
-		cout << "ARM7 I/O read, register of " << hex << (int)(addr & 0xFFFFFF) << endl;
+		// cout << "ARM7 I/O read, register of " << hex << (int)(addr & 0xFFFFFF) << endl;
 
 		if (memoryreadhandlers7[(addr & 0xFFFFFF)])
 		{
@@ -200,7 +233,14 @@ namespace nds
 	    {
 		if ((addr & 0xFFFFFF) < 0x800000)
 		{
-		    return;
+		    if (swram_ptr7 != NULL)
+	    	    {
+	    		*(uint8_t*)&swram_ptr7[(addr & swram_mask7)] = val;
+	    	    }
+	   	    else
+	    	    {
+	    		return;
+	    	    }
 		}
 		else
 		{
@@ -210,7 +250,7 @@ namespace nds
 	    break;
 	    case 0x04:
 	    {
-		cout << "ARM7 I/O write, register of " << hex << (int)(addr & 0xFFFFFF) << endl;
+		// cout << "ARM7 I/O write, register of " << hex << (int)(addr & 0xFFFFFF) << endl;
 		if (memorywritehandlers7[(addr & 0xFFFFFF)])
 		{
 		    memorywritehandlers7[(addr & 0xFFFFFF)](addr, val);
@@ -256,6 +296,8 @@ namespace nds
 	{
 	    case 0x180: temp = (ipcsync9 & 0xFF); break;
 	    case 0x181: temp = (ipcsync9 >> 8); break;
+	    case 0x182: temp = 0x00; break;
+	    case 0x183: temp = 0x00; break;
 	    default: cout << "Unrecognized ARM9 IPC read from address of " << hex << (int)((addr & 0xFFF)) << endl; exit(1); temp = 0; break;
 	}
 
@@ -282,6 +324,8 @@ namespace nds
 		}
 	    }
 	    break;
+	    case 0x182: return; break;
+	    case 0x183: return; break;
 	    default: cout << "Unrecognized ARM9 IPC write to address of " << hex << (int)((addr & 0xFFF)) << ", value of " << hex << (int)(val) << endl; exit(1); break;
 	}
     }
@@ -294,6 +338,8 @@ namespace nds
 	{
 	    case 0x180: temp = (ipcsync7 & 0xFF); break;
 	    case 0x181: temp = (ipcsync7 >> 8); break;
+	    case 0x182: temp = 0x00; break;
+	    case 0x183: temp = 0x00; break;
 	    default: cout << "Unrecognized ARM7 IPC read from address of " << hex << (int)((addr & 0xFFF)) << endl; exit(1); temp = 0; break;
 	}
 
@@ -320,6 +366,8 @@ namespace nds
 		}
 	    }
 	    break;
+	    case 0x182: return; break;
+	    case 0x183: return; break;
 	    default: cout << "Unrecognized ARM7 IPC write to address of " << hex << (int)((addr & 0xFFF)) << ", value of " << hex << (int)(val) << endl; memarm7.printregs(); exit(1); break;
 	}
     }
